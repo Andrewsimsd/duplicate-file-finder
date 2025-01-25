@@ -1,0 +1,9 @@
+[package]
+name = "hello_world"
+version = "0.1.0"
+edition = "2021"
+
+
+[dependencies]
+sha2 = "0.10"        # For SHA-256 hashing
+twox-hash = "2.1"    # For fast XXH3 hashing
