@@ -1,9 +1,0 @@
-Size: 613.53 KB
-/home/andrew/Documents/GitHub/duplicate-file-finder/duplicate-file-finder/resources/1_GI-td9gs8D5OKZd19mAOqA (Copy).png
-/home/andrew/Documents/GitHub/duplicate-file-finder/duplicate-file-finder/resources/a deeper folder/1_GI-td9gs8D5OKZd19mAOqA.png
-/home/andrew/Documents/GitHub/duplicate-file-finder/duplicate-file-finder/resources/1_GI-td9gs8D5OKZd19mAOqA.png
-
-Size: 11 bytes
-/home/andrew/Documents/GitHub/duplicate-file-finder/duplicate-file-finder/resources/text_file (Copy).txt
-/home/andrew/Documents/GitHub/duplicate-file-finder/duplicate-file-finder/resources/text_file.txt
-
