@@ -1,4 +1,5 @@
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
+use std::env;
 use std::fs::{self, File};
 use std::hash::Hasher;
 use std::io::{BufReader, Read, Write};
@@ -120,7 +121,18 @@ fn write_output(duplicates: HashMap<u64, Vec<PathBuf>>, output_file: &str) {
 }
 
 fn main() {
-    let dir = Path::new("/home/andrew/Documents/GitHub/duplicate-file-finder/duplicate-file-finder/resources");
+    let args: Vec<String> = env::args().collect();
+    if args.len() < 2 {
+        eprintln!("Usage: duplicate_finder <directory>");
+        return;
+    }
+
+    let dir = Path::new(&args[1]);
+    if !dir.exists() || !dir.is_dir() {
+        eprintln!("Error: '{}' is not a valid directory", dir.display());
+        return;
+    }
+
     let output_file = "duplicates.txt";
 
     println!("Scanning directory: {}", dir.display());
