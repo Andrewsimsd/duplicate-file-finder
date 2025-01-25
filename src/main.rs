@@ -7,8 +7,9 @@ use std::path::{Path, PathBuf};
 use walkdir::WalkDir;
 use twox_hash::XxHash64;
 use sha2::{Digest, Sha256};
+use indicatif::{ProgressBar, ProgressStyle};
 
-/// Converts a file size in bytes to a human-readable format (GB, MB, KB).
+/// Converts file size in bytes to a human-readable format (GB, MB, KB).
 fn format_size(size: u64) -> String {
     const KB: u64 = 1024;
     const MB: u64 = KB * 1024;
@@ -25,12 +26,12 @@ fn format_size(size: u64) -> String {
     }
 }
 
-/// Calculates a fast hash for the first few KB of a file to quickly detect differences.
+/// Calculates a fast hash for the first few KB of a file.
 fn quick_hash(file_path: &Path) -> Option<u64> {
     let mut hasher = XxHash64::with_seed(0);
     let file = File::open(file_path).ok()?;
     let mut reader = BufReader::new(file);
-    let mut buffer = [0; 8192]; // Read only the first 8KB for a quick hash
+    let mut buffer = [0; 8192];
     let bytes_read = reader.read(&mut buffer).ok()?;
     
     hasher.write(&buffer[..bytes_read]);
@@ -38,15 +39,16 @@ fn quick_hash(file_path: &Path) -> Option<u64> {
 }
 
 /// Computes a full cryptographic hash (SHA-256) for file comparison.
-fn full_hash(file_path: &Path) -> Option<String> {
+fn full_hash(file_path: &Path, progress: &ProgressBar) -> Option<String> {
     let file = File::open(file_path).ok()?;
     let mut reader = BufReader::new(file);
     let mut hasher = Sha256::new();
-    let mut buffer = [0; 65536]; // 64KB buffer size for efficient hashing
-    
+    let mut buffer = [0; 65536];
+
     while let Ok(bytes_read) = reader.read(&mut buffer) {
         if bytes_read == 0 { break; }
         hasher.update(&buffer[..bytes_read]);
+        progress.inc(1); // Update progress bar
     }
 
     Some(format!("{:x}", hasher.finalize()))
@@ -55,20 +57,30 @@ fn full_hash(file_path: &Path) -> Option<String> {
 /// Finds duplicate files in the given directory recursively.
 fn find_duplicates(dir: &Path) -> HashMap<u64, Vec<PathBuf>> {
     let mut size_map: HashMap<u64, Vec<PathBuf>> = HashMap::new();
-    
-    // Recursively collect files grouped by size
-    for entry in WalkDir::new(dir).into_iter().filter_map(Result::ok) {
-        let path = entry.path().to_path_buf();
-        if path.is_file() {
-            if let Ok(metadata) = path.metadata() {
-                size_map.entry(metadata.len()).or_default().push(path);
-            }
+    let files: Vec<PathBuf> = WalkDir::new(dir)
+        .into_iter()
+        .filter_map(Result::ok)
+        .filter(|entry| entry.path().is_file())
+        .map(|entry| entry.path().to_path_buf())
+        .collect();
+
+    let progress = ProgressBar::new(files.len() as u64).with_style(
+        ProgressStyle::default_bar()
+            .template("[Scanning] {wide_bar} {pos}/{len} files")
+            .expect("Invalid progress bar template")
+            .progress_chars("#>-"),
+    );
+
+    for file in &files {
+        if let Ok(metadata) = file.metadata() {
+            size_map.entry(metadata.len()).or_default().push(file.clone());
         }
+        progress.inc(1);
     }
+    progress.finish();
 
     let mut potential_dupes: HashMap<u64, Vec<PathBuf>> = HashMap::new();
 
-    // Use quick hash for fast grouping
     for (_size, files) in size_map.into_iter().filter(|(_, f)| f.len() > 1) {
         let mut quick_hash_map: HashMap<u64, Vec<PathBuf>> = HashMap::new();
         
@@ -84,13 +96,19 @@ fn find_duplicates(dir: &Path) -> HashMap<u64, Vec<PathBuf>> {
     }
 
     let mut duplicates: HashMap<u64, Vec<PathBuf>> = HashMap::new();
+    let total_files = potential_dupes.values().map(Vec::len).sum::<usize>() as u64;
+    let progress = ProgressBar::new(total_files).with_style(
+        ProgressStyle::default_bar()
+            .template("[Hashing] {wide_bar} {pos}/{len} files")
+            .expect("Invalid progress bar template")
+            .progress_chars("#>-"),
+    );
 
-    // Use full hash for final comparison
     for (_qh, files) in potential_dupes {
         let mut hash_map: HashMap<String, Vec<PathBuf>> = HashMap::new();
         
         for file in files {
-            if let Some(fh) = full_hash(&file) {
+            if let Some(fh) = full_hash(&file, &progress) {
                 hash_map.entry(fh).or_default().push(file);
             }
         }
@@ -100,6 +118,7 @@ fn find_duplicates(dir: &Path) -> HashMap<u64, Vec<PathBuf>> {
             duplicates.insert(size, group);
         }
     }
+    progress.finish();
 
     duplicates
 }
