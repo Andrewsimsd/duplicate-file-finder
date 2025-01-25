@@ -10,8 +10,8 @@ use sha2::{Digest, Sha256};
 use indicatif::{ProgressBar, ProgressStyle};
 use fern::Dispatch;
 use log::{info, error};
-use chrono::{Local, Utc};
-use std::process::Command;
+use chrono::{Local};
+
 
 /// Sets up logging to a file
 fn setup_logger() -> Result<(), fern::InitError> {
