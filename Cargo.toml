@@ -12,3 +12,4 @@ indicatif = "0.17"   # For the progress bar
 fern = "0.7.1"
 log = "0.4"
 chrono = "0.4"
+whoami = "1.5.2"
