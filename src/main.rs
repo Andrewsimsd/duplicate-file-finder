@@ -3,6 +3,7 @@ use std::fs::{self, File};
 use std::hash::Hasher;
 use std::io::{BufReader, Read, Write};
 use std::path::{Path, PathBuf};
+use walkdir::WalkDir;
 use twox_hash::XxHash64;
 use sha2::{Digest, Sha256};
 
@@ -50,18 +51,16 @@ fn full_hash(file_path: &Path) -> Option<String> {
     Some(format!("{:x}", hasher.finalize()))
 }
 
-/// Finds duplicate files in the given directory.
+/// Finds duplicate files in the given directory recursively.
 fn find_duplicates(dir: &Path) -> HashMap<u64, Vec<PathBuf>> {
     let mut size_map: HashMap<u64, Vec<PathBuf>> = HashMap::new();
     
-    // Group files by size
-    if let Ok(entries) = fs::read_dir(dir) {
-        for entry in entries.flatten() {
-            let path = entry.path();
-            if path.is_file() {
-                if let Ok(metadata) = path.metadata() {
-                    size_map.entry(metadata.len()).or_default().push(path);
-                }
+    // Recursively collect files grouped by size
+    for entry in WalkDir::new(dir).into_iter().filter_map(Result::ok) {
+        let path = entry.path().to_path_buf();
+        if path.is_file() {
+            if let Ok(metadata) = path.metadata() {
+                size_map.entry(metadata.len()).or_default().push(path);
             }
         }
     }
@@ -121,7 +120,7 @@ fn write_output(duplicates: HashMap<u64, Vec<PathBuf>>, output_file: &str) {
 }
 
 fn main() {
-    let dir = Path::new("/home/andrew/Documents/GitHub/duplicate-file-finder/resources");
+    let dir = Path::new("/home/andrew/Documents/GitHub/duplicate-file-finder/duplicate-file-finder/resources");
     let output_file = "duplicates.txt";
 
     println!("Scanning directory: {}", dir.display());
@@ -134,4 +133,3 @@ fn main() {
         println!("Duplicate files saved to {}", output_file);
     }
 }
-
