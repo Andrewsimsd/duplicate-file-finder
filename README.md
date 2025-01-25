@@ -8,7 +8,7 @@ A simple yet efficient program written in Rust to detect and report duplicate fi
 - **Efficient hashing** using quick hash (XXHash) and full hash (SHA-256) for accurate file comparison.
 - **Progress bars** for scanning and hashing files (using `indicatif`).
 - **Logs** events to a log file with `fern`, formatted in `YYYYMMDD` for the date.
-- **Generates a report** of duplicate files, ordered by file size, in a human-readable format (KB, MB, GB).
+- **Generates a report** of duplicate files, ordered by file size, in a human-readable format (KB, MB, GB, TB).
 
 ## Requirements
 
