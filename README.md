@@ -23,7 +23,7 @@ A simple yet efficient program written in Rust to detect and report duplicate fi
 
 1. **Clone the repository**:
     ```bash
-    git clone https://github.com/yourusername/duplicate-finder.git
+    git clone https://github.com/Andrewsimsd/duplicate-finder.git
     cd duplicate-finder
     ```
 
