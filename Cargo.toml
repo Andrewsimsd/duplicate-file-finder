@@ -9,3 +9,6 @@ sha2 = "0.10"        # For SHA-256 hashing
 twox-hash = "2.1"    # For fast XXH3 hashing
 walkdir = "2.4"      # For recursive directory traversal
 indicatif = "0.17"   # For the progress bar
+fern = "0.7.1"
+log = "0.4"
+chrono = "0.4"

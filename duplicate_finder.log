@@ -1,0 +1,5 @@
+[2025-01-25 15:27:30] [INFO] Starting duplicate file detection in /home/andrew/Documents/GitHub/duplicate-file-finder/duplicate-file-finder/resources
+[2025-01-25 15:27:30] [INFO] Scanning 6 files in /home/andrew/Documents/GitHub/duplicate-file-finder/duplicate-file-finder/resources
+[2025-01-25 15:27:30] [INFO] File scanning completed.
+[2025-01-25 15:27:30] [INFO] Duplicate detection completed.
+[2025-01-25 15:27:30] [INFO] Duplicate files saved to duplicates.txt

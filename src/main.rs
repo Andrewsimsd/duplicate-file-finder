@@ -8,6 +8,26 @@ use walkdir::WalkDir;
 use twox_hash::XxHash64;
 use sha2::{Digest, Sha256};
 use indicatif::{ProgressBar, ProgressStyle};
+use fern::Dispatch;
+use log::{info, error};
+use chrono::Local;
+
+/// Sets up logging to a file
+fn setup_logger() -> Result<(), fern::InitError> {
+    Dispatch::new()
+        .format(|out, message, record| {
+            out.finish(format_args!(
+                "[{}] [{}] {}",
+                Local::now().format("%Y-%m-%d %H:%M:%S"),
+                record.level(),
+                message
+            ))
+        })
+        .level(log::LevelFilter::Info)
+        .chain(fern::log_file("duplicate_finder.log")?)
+        .apply()?;
+    Ok(())
+}
 
 /// Converts file size in bytes to a human-readable format (GB, MB, KB).
 fn format_size(size: u64) -> String {
@@ -64,6 +84,8 @@ fn find_duplicates(dir: &Path) -> HashMap<u64, Vec<PathBuf>> {
         .map(|entry| entry.path().to_path_buf())
         .collect();
 
+    info!("Scanning {} files in {}", files.len(), dir.display());
+
     let progress = ProgressBar::new(files.len() as u64).with_style(
         ProgressStyle::default_bar()
             .template("[Scanning] {wide_bar} {pos}/{len} files")
@@ -78,6 +100,7 @@ fn find_duplicates(dir: &Path) -> HashMap<u64, Vec<PathBuf>> {
         progress.inc(1);
     }
     progress.finish();
+    info!("File scanning completed.");
 
     let mut potential_dupes: HashMap<u64, Vec<PathBuf>> = HashMap::new();
 
@@ -120,6 +143,7 @@ fn find_duplicates(dir: &Path) -> HashMap<u64, Vec<PathBuf>> {
     }
     progress.finish();
 
+    info!("Duplicate detection completed.");
     duplicates
 }
 
@@ -137,28 +161,35 @@ fn write_output(duplicates: HashMap<u64, Vec<PathBuf>>, output_file: &str) {
         }
         writeln!(file, "").unwrap();
     }
+    info!("Duplicate files saved to {}", output_file);
 }
 
 fn main() {
+    setup_logger().expect("Failed to initialize logger");
+
     let args: Vec<String> = env::args().collect();
     if args.len() < 2 {
+        error!("Usage: duplicate_finder <directory>");
         eprintln!("Usage: duplicate_finder <directory>");
         return;
     }
 
     let dir = Path::new(&args[1]);
     if !dir.exists() || !dir.is_dir() {
+        error!("Error: '{}' is not a valid directory", dir.display());
         eprintln!("Error: '{}' is not a valid directory", dir.display());
         return;
     }
 
     let output_file = "duplicates.txt";
 
+    info!("Starting duplicate file detection in {}", dir.display());
     println!("Scanning directory: {}", dir.display());
     let duplicates = find_duplicates(dir);
 
     if duplicates.is_empty() {
         println!("No duplicate files found.");
+        info!("No duplicate files found.");
     } else {
         write_output(duplicates, output_file);
         println!("Duplicate files saved to {}", output_file);
