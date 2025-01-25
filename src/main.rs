@@ -18,7 +18,7 @@ fn setup_logger() -> Result<(), fern::InitError> {
         .format(|out, message, record| {
             out.finish(format_args!(
                 "[{}] [{}] {}",
-                Local::now().format("%Y-%m-%d %H:%M:%S"),
+                Local::now().format("%Y%m%d %H:%M:%S"), // Changed format to YYYYMMDD
                 record.level(),
                 message
             ))
@@ -28,6 +28,7 @@ fn setup_logger() -> Result<(), fern::InitError> {
         .apply()?;
     Ok(())
 }
+
 
 /// Converts file size in bytes to a human-readable format (GB, MB, KB).
 fn format_size(size: u64) -> String {
