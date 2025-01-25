@@ -1,7 +1,3 @@
-Here's a **README.md** file for the code base that explains the functionality and how to use the program:
-
----
-
 # Duplicate File Finder
 
 A simple yet efficient program written in Rust to detect and report duplicate files within a specified directory and its subdirectories. The program leverages hashing techniques to ensure accuracy while minimizing runtime overhead. It uses a terminal progress indicator and logs key events, making it both user-friendly and reliable.
@@ -98,7 +94,3 @@ Feel free to fork the repository, submit issues, or create pull requests. We wel
 ## License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
----
-
-This README file should provide enough context to users on how to use the program, understand the logging, and configure the program based on their needs.
