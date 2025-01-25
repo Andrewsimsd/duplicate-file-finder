@@ -81,75 +81,81 @@ fn full_hash(file_path: &Path, progress: &ProgressBar) -> Option<String> {
 
 /// Finds duplicate files in the given directory recursively.
 fn find_duplicates(dir: &Path) -> HashMap<u64, Vec<PathBuf>> {
-    let mut size_map: HashMap<u64, Vec<PathBuf>> = HashMap::new();
-    let files: Vec<PathBuf> = WalkDir::new(dir)
+    let mut size_map: HashMap<u64, Vec<PathBuf>> = HashMap::new();  // Maps file sizes to paths
+    let files: Vec<PathBuf> = WalkDir::new(dir)  // Recursively walk through the directory
         .into_iter()
         .filter_map(Result::ok)
-        .filter(|entry| entry.path().is_file())
-        .map(|entry| entry.path().to_path_buf())
+        .filter(|entry| entry.path().is_file())  // Only consider files
+        .map(|entry| entry.path().to_path_buf())  // Collect file paths
         .collect();
 
-    info!("Scanning {} files in {}", files.len(), dir.display());
+    info!("{} files identified in {}", files.len(), dir.display());
 
     let progress = ProgressBar::new(files.len() as u64).with_style(
         ProgressStyle::default_bar()
-            .template("[Scanning] {wide_bar} {pos}/{len} files")
+            .template("[Scanning] {wide_bar} {pos}/{len} files")  // Progress bar template
             .expect("Invalid progress bar template")
             .progress_chars("#>-"),
     );
 
+    // Loop over all files to collect them by size to quickly filter out non-duplicates.
     for file in &files {
         if let Ok(metadata) = file.metadata() {
-            size_map.entry(metadata.len()).or_default().push(file.clone());
+            size_map.entry(metadata.len()).or_default().push(file.clone());  // Group files by size
         }
-        progress.inc(1);
+        progress.inc(1);  // Update progress bar
     }
-    progress.finish();
-    info!("File scanning completed.");
+    progress.finish();  // Finish progress bar
+    info!("{} file sizes identified.", size_map.len());
 
     let mut potential_dupes: HashMap<u64, Vec<PathBuf>> = HashMap::new();
 
+    // Further filter files by quick hash
     for (_size, files) in size_map.into_iter().filter(|(_, f)| f.len() > 1) {
         let mut quick_hash_map: HashMap<u64, Vec<PathBuf>> = HashMap::new();
         
         for file in files {
             if let Some(qh) = quick_hash(&file) {
-                quick_hash_map.entry(qh).or_default().push(file);
+                quick_hash_map.entry(qh).or_default().push(file);  // Group by quick hash
             }
         }
 
+        // Filter out groups with only one file, indicating no duplicates
         for (_qh, group) in quick_hash_map.into_iter().filter(|(_, g)| g.len() > 1) {
-            potential_dupes.insert(_qh, group);
+            potential_dupes.insert(_qh, group);  // Add groups with duplicates to potential duplicates
         }
     }
+    info!("{} unique quick hashes identified.", potential_dupes.len());
 
     let mut duplicates: HashMap<u64, Vec<PathBuf>> = HashMap::new();
     let total_files = potential_dupes.values().map(Vec::len).sum::<usize>() as u64;
     let progress = ProgressBar::new(total_files).with_style(
         ProgressStyle::default_bar()
-            .template("[Hashing] {wide_bar} {pos}/{len} files")
+            .template("[Hashing] {wide_bar} {pos}/{len} files")  // Progress bar for final hashing step
             .expect("Invalid progress bar template")
             .progress_chars("#>-"),
     );
 
+    // Final step: Perform full hashing (SHA-256) and group duplicates
     for (_qh, files) in potential_dupes {
         let mut hash_map: HashMap<String, Vec<PathBuf>> = HashMap::new();
         
         for file in files {
             if let Some(fh) = full_hash(&file, &progress) {
-                hash_map.entry(fh).or_default().push(file);
+                hash_map.entry(fh).or_default().push(file);  // Group by full hash
             }
         }
 
+        // Only keep groups of files with the same hash (duplicates)
         for (_fh, group) in hash_map.into_iter().filter(|(_, g)| g.len() > 1) {
             let size = fs::metadata(&group[0]).ok().map(|m| m.len()).unwrap_or(0);
-            duplicates.insert(size, group);
+            duplicates.insert(size, group);  // Store duplicates by size
         }
     }
-    progress.finish();
+    progress.finish();  // Finish progress bar
 
-    info!("Duplicate detection completed.");
-    duplicates
+    info!("{} duplicate files identified.", duplicates.len());
+    duplicates  // Return the found duplicates
 }
 
 /// Writes duplicate files to an output file with header information.
