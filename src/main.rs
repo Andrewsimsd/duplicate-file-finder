@@ -91,12 +91,7 @@ fn find_duplicates(dir: &Path) -> HashMap<u64, Vec<PathBuf>> {
 
     info!("{} files identified in {}", files.len(), dir.display());
 
-    let progress = ProgressBar::new(files.len() as u64).with_style(
-        ProgressStyle::default_bar()
-            .template("[Scanning] {wide_bar} {pos}/{len} files")  // Progress bar template
-            .expect("Invalid progress bar template")
-            .progress_chars("#>-"),
-    );
+    let progress = ProgressBar::new(files.len() as u64);
 
     // Loop over all files to collect them by size to quickly filter out non-duplicates.
     for file in &files {
@@ -129,12 +124,7 @@ fn find_duplicates(dir: &Path) -> HashMap<u64, Vec<PathBuf>> {
 
     let mut duplicates: HashMap<u64, Vec<PathBuf>> = HashMap::new();
     let total_files = potential_dupes.values().map(Vec::len).sum::<usize>() as u64;
-    let progress = ProgressBar::new(total_files).with_style(
-        ProgressStyle::default_bar()
-            .template("[Hashing] {wide_bar} {pos}/{len} files")  // Progress bar for final hashing step
-            .expect("Invalid progress bar template")
-            .progress_chars("#>-"),
-    );
+    let progress = ProgressBar::new(total_files);
 
     // Final step: Perform full hashing (SHA-256) and group duplicates
     for (_qh, files) in potential_dupes {
