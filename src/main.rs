@@ -210,3 +210,102 @@ fn main() {
         println!("Duplicate files saved to {}", output_file);
     }
 }
+
+// Existing imports and code ...
+
+/// Unit tests module
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::fs::{self, File};
+    use std::io::Write;
+    use tempfile::tempdir;
+
+    #[test]
+    fn test_format_size() {
+        assert_eq!(format_size(500), "500 bytes");
+        assert_eq!(format_size(1500), "1.46 KB");
+        assert_eq!(format_size(1_500_000), "1.43 MB");
+        assert_eq!(format_size(1_500_000_000), "1.40 GB");
+        assert_eq!(format_size(1_500_000_000_000), "1.36 TB");
+    }
+
+    #[test]
+    fn test_quick_hash() {
+        let dir = tempdir().unwrap();
+        let file_path = dir.path().join("test_file.txt");
+        let mut file = File::create(&file_path).unwrap();
+        writeln!(file, "Hello, world!").unwrap();
+
+        let hash = quick_hash(&file_path);
+        assert!(hash.is_some());
+    }
+
+    #[test]
+    fn test_full_hash() {
+        let dir = tempdir().unwrap();
+        let file_path = dir.path().join("test_file.txt");
+        let mut file = File::create(&file_path).unwrap();
+        writeln!(file, "Hello, world!").unwrap();
+
+        let progress = ProgressBar::hidden(); // Use a hidden progress bar for tests
+        let hash = full_hash(&file_path, &progress);
+        assert!(hash.is_some());
+        assert_eq!(
+            hash.unwrap(),
+            "d9014c4624844aa5bac314773d6b689ad467fa4e1d1a50a1b8a99d5a95f72ff5"
+        ); // Precomputed SHA-256 of "Hello, world!\n"
+    }
+
+    #[test]
+    fn test_find_duplicates() {
+        let dir = tempdir().unwrap();
+
+        // Create some duplicate files
+        let file1 = dir.path().join("file1.txt");
+        let file2 = dir.path().join("file2.txt");
+        let unique_file = dir.path().join("unique.txt");
+
+        fs::write(&file1, "Duplicate content").unwrap();
+        fs::write(&file2, "Duplicate content").unwrap();
+        fs::write(&unique_file, "Unique content").unwrap();
+
+        let duplicates = find_duplicates(dir.path());
+        assert_eq!(duplicates.len(), 1); // Only one group of duplicates
+        let duplicate_group = duplicates.values().next().unwrap();
+        assert_eq!(duplicate_group.len(), 2);
+        assert!(duplicate_group.contains(&file1));
+        assert!(duplicate_group.contains(&file2));
+    }
+
+    #[test]
+    fn test_write_output() {
+        let dir = tempdir().unwrap();
+
+        // Create some files and simulate duplicates
+        let file1 = dir.path().join("file1.txt");
+        let file2 = dir.path().join("file2.txt");
+        fs::write(&file1, "Duplicate content").unwrap();
+        fs::write(&file2, "Duplicate content").unwrap();
+
+        let mut duplicates = HashMap::new();
+        duplicates.insert(
+            file1.metadata().unwrap().len(),
+            vec![file1.clone(), file2.clone()],
+        );
+
+        let output_file = dir.path().join("output.txt");
+        write_output(
+            duplicates,
+            output_file.to_str().unwrap(),
+            "20250101 12:00:00",
+            dir.path(),
+        );
+
+        let output = fs::read_to_string(&output_file).unwrap();
+        assert!(output.contains("Duplicate File Finder Report"));
+        assert!(output.contains(file1.to_str().unwrap()));
+        assert!(output.contains(file2.to_str().unwrap()));
+    }
+}
+
