@@ -1,6 +1,6 @@
 [![Crates.io](https://img.shields.io/crates/v/duplicate_file_finder.svg)](https://crates.io/crates/duplicate_file_finder)
 [![Documentation](https://docs.rs/duplicate_file_finder/badge.svg)](https://docs.rs/duplicate_file_finder)
-[![CI](https://github.com/Andrewsimsd/duplicate_file_finder/actions/workflows/CI.yml/badge.svg)](https://github.com/Andrewsimsd/duplicate_file_finder/actions)
+[![CI](https://github.com/Andrewsimsd/duplicate-file-finder/actions/workflows/CI.yml/badge.svg)](https://github.com/Andrewsimsd/duplicate-file-finder/actions)
 [![License](https://img.shields.io/crates/l/duplicate_file_finder)](LICENSE)
 [![GitHub](https://img.shields.io/github/stars/Andrewsimsd/duplicate_file_finder?style=social)](https://github.com/Andrewsimsd/duplicate-file-finder)
 # Duplicate File Finder
