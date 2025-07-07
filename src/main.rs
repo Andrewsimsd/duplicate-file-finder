@@ -4,7 +4,7 @@ use log::{error, info};
 use chrono::Local;
 use duplicate_file_finder::{setup_logger, find_duplicates, write_output};
 
-const VERSION: &str = "1.0.0";
+const VERSION: &str = "0.1.2";
 
 fn print_help(program_name: &str) {
     println!("Duplicate File Finder v{}", VERSION);
