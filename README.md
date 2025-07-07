@@ -20,19 +20,6 @@ A simple yet efficient program written in Rust to detect and report duplicate fi
 - Rust 1.60+ (or use `cargo` for managing dependencies)
 - Dependencies: `sha2`, `twox-hash`, `walkdir`, `indicatif`, `fern`, `log`, `chrono`
 
-## Installation
-
-1. **Clone the repository**:
-    ```bash
-    git clone https://github.com/Andrewsimsd/duplicate-finder.git
-    cd duplicate-finder
-    ```
-
-2. **Install dependencies**:
-    ```bash
-    cargo build
-    ```
-
 ## Usage
 
 To use the Duplicate Finder, run the following command:
