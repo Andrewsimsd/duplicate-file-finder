@@ -2,7 +2,7 @@
 [![Documentation](https://docs.rs/duplicate_file_finder/badge.svg)](https://docs.rs/duplicate_file_finder)
 [![CI](https://github.com/Andrewsimsd/duplicate-file-finder/actions/workflows/CI.yml/badge.svg)](https://github.com/Andrewsimsd/duplicate-file-finder/actions)
 [![License](https://img.shields.io/crates/l/duplicate_file_finder)](LICENSE)
-[![GitHub](https://img.shields.io/github/stars/Andrewsimsd/duplicate_file_finder?style=social)](https://github.com/Andrewsimsd/duplicate-file-finder)
+[![GitHub](https://img.shields.io/github/stars/Andrewsimsd/duplicate-file-finder?style=social)](https://github.com/Andrewsimsd/duplicate-file-finder)
 # Duplicate File Finder
 
 A simple yet efficient program written in Rust to detect and report duplicate files within a specified directory and its subdirectories. The program leverages hashing techniques to ensure accuracy while minimizing runtime overhead. It uses a terminal progress indicator and logs key events, making it both user-friendly and reliable.
