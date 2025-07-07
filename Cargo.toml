@@ -1,16 +1,16 @@
 [package]
 name = "duplicate_file_finder"
-version = "0.1.0"
+version = "1.0.0"
 edition = "2021"
 
 
 [dependencies]
-sha2 = "0.10"        # For SHA-256 hashing
-twox-hash = "2.1"    # For fast XXH3 hashing
+sha2 = "0.10.9"        # For SHA-256 hashing
+twox-hash = "2.1.1"    # For fast XXH3 hashing
 walkdir = "2.4"      # For recursive directory traversal
-indicatif = "0.17"   # For the progress bar
+indicatif = "0.18"   # For the progress bar
 fern = "0.7.1"
-log = "0.4"
-chrono = "0.4"
-whoami = "1.5.2"
+log = "0.4.27"
+chrono = "0.4.41"
+whoami = "1.6.0"
 tempfile = "3.15.0"

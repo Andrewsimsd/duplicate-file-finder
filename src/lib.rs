@@ -212,7 +212,7 @@ pub fn write_output(
 
     writeln!(writer, "Total Potential Space Savings: {}", format_size(total_savings))?;
     writeln!(writer)?;
-    
+
     // Write duplicate files
     for (size, paths) in entries {
         writeln!(writer, "Size: {}", format_size(size))?;
@@ -338,8 +338,7 @@ mod tests {
         let mut file = File::create(&file_path).unwrap();
         writeln!(file, "Hello, world!").unwrap();
 
-        let progress = ProgressBar::hidden(); // Use a hidden progress bar for tests
-        let hash = full_hash(&file_path, &progress);
+        let hash = full_hash(&file_path);
         assert!(hash.is_some());
         assert_eq!(
             hash.unwrap(),
