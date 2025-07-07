@@ -1,0 +1,43 @@
+name: Release
+
+on:
+  push:
+    branches: [ master ]
+    tags:
+      - 'v*'
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    - name: Run tests
+      run: cargo test --verbose
+    #- name: Check for warnings
+    #  run: cargo clippy --all-targets --all-features -- -D warnings
+    - name: Doc tests
+      run: cargo test --doc
+
+  release:
+    name: Create Github Release
+    needs: test
+    if: startswith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Build release binary
+      run: cargo build --release
+
+    - name: Upload Release Asset
+      uses: softprops/action-gh-release@v1
+      with:
+        generate_release_notes: true
+        token: ${{ secrets.GITHUB_TOKEN }}
+        name: ${{ github.ref_name }}
+        files: |
+          target/release/duplicate_file_finder
+
+    - name: Publish to crates.io
+      run: cargo publish --token ${{ secrets.CRATES_IO_TOKEN }}

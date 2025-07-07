@@ -2,7 +2,15 @@
 name = "duplicate_file_finder"
 version = "1.0.0"
 edition = "2021"
-
+authors = ["Andrew Sims andrew,simsd.@gmail.com"]
+description = "Finds duplicate files."
+license = "MIT"
+repository = "https://github.com/Andrewsimsd/duplicate-file-finder"
+homepage = "https://github.com/Andrewsimsd/duplicate-file-finder"
+readme = "README.md"
+keywords = ["duplicates", "files", "cli"]
+categories = ["command-line-utilities", "filesystem"]
+exclude = ["/.github", "/tests", "*.log"]
 
 [dependencies]
 sha2 = "0.10.9"        # For SHA-256 hashing
