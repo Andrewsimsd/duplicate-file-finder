@@ -24,7 +24,7 @@ use std::error::Error;
 /// ```
 /// use duplicate_file_finder::{setup_logger};
 /// setup_logger().expect("Failed to initialize logger");
-/// ```rust
+/// ```
 #[must_use]
 pub fn setup_logger() -> Result<(), fern::InitError> {
     Dispatch::new()
@@ -56,11 +56,6 @@ pub fn setup_logger() -> Result<(), fern::InitError> {
 /// A `HashMap` where the key is the file size (in bytes), and the value is a `Vec<PathBuf>`
 /// containing paths to duplicate files of that size.
 ///
-/// # Example
-/// ```rust, nocompile
-/// use duplicate_file_finder::{find_duplicates};
-/// let duplicates = find_duplicates(Path::new("/some/directory"));
-/// ```
 pub fn find_duplicates(dir: &Path) -> HashMap<u64, Vec<PathBuf>> {
     let mut size_map: HashMap<u64, Vec<PathBuf>> = HashMap::new();  // Maps file sizes to paths
     let files: Vec<PathBuf> = WalkDir::new(dir)  // Recursively walk through the directory
@@ -162,7 +157,7 @@ pub fn find_duplicates(dir: &Path) -> HashMap<u64, Vec<PathBuf>> {
 ///
 /// # Example
 ///
-/// ```rust
+/// ```
 /// use std::collections::HashMap;
 /// use std::path::PathBuf;
 /// use duplicate_file_finder::{write_output};
