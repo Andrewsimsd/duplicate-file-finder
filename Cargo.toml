@@ -1,6 +1,6 @@
 [package]
 name = "duplicate_file_finder"
-version = "0.1.1"
+version = "0.1.2"
 edition = "2021"
 authors = ["Andrew Sims andrew,simsd.@gmail.com"]
 description = "Finds duplicate files."
