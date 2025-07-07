@@ -71,7 +71,8 @@ pub fn find_duplicates(dir: &Path) -> HashMap<u64, Vec<PathBuf>> {
         .collect();
 
     info!("{} files identified in {}", files.len(), dir.display());
-
+    println!("{} files identified in {}", files.len(), dir.display());
+    println!("Sorting files by size...");
     let progress = ProgressBar::new(files.len() as u64);
 
     // Loop over all files to collect them by size to quickly filter out non-duplicates.
@@ -83,9 +84,10 @@ pub fn find_duplicates(dir: &Path) -> HashMap<u64, Vec<PathBuf>> {
     }
     progress.finish();  // Finish progress bar
     info!("{} file sizes identified.", size_map.len());
-
+    println!("{} file sizes identified.", size_map.len());
+    println!("Computing quick hashes..");
     let mut potential_dupes: HashMap<u64, Vec<PathBuf>> = HashMap::new();
-
+    let progress = ProgressBar::new(size_map.len() as u64);
     // Further filter files by quick hash
     for (_size, files) in size_map.into_iter().filter(|(_, f)| f.len() > 1) {
         let mut quick_hash_map: HashMap<u64, Vec<PathBuf>> = HashMap::new();
@@ -100,9 +102,12 @@ pub fn find_duplicates(dir: &Path) -> HashMap<u64, Vec<PathBuf>> {
         for (_qh, group) in quick_hash_map.into_iter().filter(|(_, g)| g.len() > 1) {
             potential_dupes.insert(_qh, group);  // Add groups with duplicates to potential duplicates
         }
+        progress.inc(1);  // Update progress bar
     }
+    progress.finish();  // Finish progress bar
     info!("{} unique quick hashes identified.", potential_dupes.len());
-
+    println!("{} unique quick hashes identified.", potential_dupes.len());
+    println!("Computing full hashes..");
     let mut duplicates: HashMap<u64, Vec<PathBuf>> = HashMap::new();
     let total_files = potential_dupes.values().map(Vec::len).sum::<usize>() as u64;
     let progress = ProgressBar::new(total_files);
@@ -112,9 +117,10 @@ pub fn find_duplicates(dir: &Path) -> HashMap<u64, Vec<PathBuf>> {
         let mut hash_map: HashMap<String, Vec<PathBuf>> = HashMap::new();
         
         for file in files {
-            if let Some(fh) = full_hash(&file, &progress) {
+            if let Some(fh) = full_hash(&file) {
                 hash_map.entry(fh).or_default().push(file);  // Group by full hash
             }
+            progress.inc(1); // Update progress bar
         }
 
         // Only keep groups of files with the same hash (duplicates)
@@ -199,6 +205,14 @@ pub fn write_output(
     writeln!(writer, "Base Directory: {}", base_dir.display())?;
     writeln!(writer)?;
 
+    // Calculate potential space savings
+    let total_savings: u64 = entries.iter()
+        .map(|(size, paths)| size * (paths.len().saturating_sub(1) as u64))
+        .sum();
+
+    writeln!(writer, "Total Potential Space Savings: {}", format_size(total_savings))?;
+    writeln!(writer)?;
+    
     // Write duplicate files
     for (size, paths) in entries {
         writeln!(writer, "Size: {}", format_size(size))?;
@@ -267,13 +281,12 @@ fn quick_hash(file_path: &Path) -> Option<u64> {
 ///
 /// # Arguments
 /// * `file_path` - Path to the file to hash.
-/// * `progress` - Progress bar to update as file is read.
 ///
 /// # Returns
 /// An `Option<String>` with the lowercase hex representation of the SHA-256 hash,
 /// or `None` if the file could not be read.
 ///
-fn full_hash(file_path: &Path, progress: &ProgressBar) -> Option<String> {
+fn full_hash(file_path: &Path) -> Option<String> {
     let file = File::open(file_path).ok()?;
     let mut reader = BufReader::new(file);
     let mut hasher = Sha256::new();
@@ -282,7 +295,6 @@ fn full_hash(file_path: &Path, progress: &ProgressBar) -> Option<String> {
     while let Ok(bytes_read) = reader.read(&mut buffer) {
         if bytes_read == 0 { break; }
         hasher.update(&buffer[..bytes_read]);
-        progress.inc(1); // Update progress bar
     }
 
     Some(format!("{:x}", hasher.finalize()))

@@ -41,7 +41,6 @@ fn main() {
             },
             Err(e)=> eprintln!("Error: {e}"),
         }
-        println!("Duplicate files saved to {}", output_file);
     }
 }
 
