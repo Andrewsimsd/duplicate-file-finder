@@ -6,6 +6,9 @@ on:
     tags:
       - 'v*'
 
+permissions:
+  contents: write 
+
 jobs:
   test:
     runs-on: ubuntu-latest
@@ -19,25 +22,44 @@ jobs:
       run: cargo test --doc
 
   release:
-    name: Create Github Release
-    needs: test
-    if: startswith(github.ref, 'refs/tags/v')
-    runs-on: ubuntu-latest
+  name: Build & Release
+  needs: test
+  if: startswith(github.ref, 'refs/tags/v')
+  runs-on: ubuntu-latest
 
-    steps:
+  strategy:
+    matrix:
+      include:
+        - target: x86_64-unknown-linux-gnu
+          os: ubuntu-latest
+          ext: ''
+        - target: x86_64-apple-darwin
+          os: macos-latest
+          ext: ''
+        - target: x86_64-pc-windows-msvc
+          os: windows-latest
+          ext: '.exe'
+
+  runs-on: ${{ matrix.os }}
+
+  steps:
     - uses: actions/checkout@v4
 
-    - name: Build release binary
-      run: cargo build --release
+    - name: Install Rust target
+      run: rustup target add ${{ matrix.target }}
+
+    - name: Build binary
+      run: cargo build --release --target ${{ matrix.target }}
+
+    - name: Rename binary
+      run: |
+        mkdir dist
+        cp target/${{ matrix.target }}/release/duplicate_file_finder dist/duplicate_file_finder-${{ matrix.target }}${{ matrix.ext }}
+      shell: bash
 
     - name: Upload Release Asset
       uses: softprops/action-gh-release@v1
       with:
         generate_release_notes: true
-        token: ${{ secrets.GITHUB_TOKEN }}
         name: ${{ github.ref_name }}
-        files: |
-          target/release/duplicate_file_finder
-
-    - name: Publish to crates.io
-      run: cargo publish --token ${{ secrets.CRATES_IO_TOKEN }}
+        files: dist/*
