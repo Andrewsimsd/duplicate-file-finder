@@ -59,7 +59,6 @@ pub fn setup_logger() -> Result<(), fern::InitError> {
 /// containing paths to duplicate files of that size.
 ///
 pub fn find_duplicates(dir: &Path) -> HashMap<u64, Vec<PathBuf>> {
-    let mut size_map: HashMap<u64, Vec<PathBuf>> = HashMap::new();  // Maps file sizes to paths
     let files: Vec<PathBuf> = WalkDir::new(dir)  // Recursively walk through the directory
         .into_iter()
         .filter_map(Result::ok)
@@ -69,7 +68,7 @@ pub fn find_duplicates(dir: &Path) -> HashMap<u64, Vec<PathBuf>> {
 
     info!("{} files identified in {}", files.len(), dir.display());
     println!("{} files identified in {}", files.len(), dir.display());
-    let progress: ProgressBar = ProgressBar::new(files.len() as u64);
+    let progress: Arc<ProgressBar> = Arc::new(ProgressBar::new(files.len() as u64));
     progress.set_style(
         ProgressStyle::with_template("[{elapsed_precise}] [{bar:40.cyan/blue}] {pos}/{len} {msg}")
             .unwrap()
@@ -78,17 +77,25 @@ pub fn find_duplicates(dir: &Path) -> HashMap<u64, Vec<PathBuf>> {
     progress.set_message("Indexing files by size...");
 
     // Loop over all files to collect them by size to quickly filter out non-duplicates.
-    for file in &files {
-        if let Ok(metadata) = file.metadata() {
-            size_map.entry(metadata.len()).or_default().push(file.clone());  // Group files by size
-        }
-        progress.inc(1);  // Update progress bar
+    let size_entries: Vec<(u64, PathBuf)> = files
+        .par_iter()
+        .filter_map(|file| {
+            let size = file.metadata().ok()?.len();
+            progress.inc(1);
+            Some((size, file.clone()))
+        })
+        .collect();
+
+    // Aggregate into HashMap<u64, Vec<PathBuf>> grouped by size
+    let mut size_map: HashMap<u64, Vec<PathBuf>> = HashMap::new();
+    for (size, path) in size_entries {
+        size_map.entry(size).or_default().push(path);
     }
-    progress.finish();  // Finish progress bar
+
+progress.finish_with_message("File sizes indexed.");
     info!("{} file sizes identified.", size_map.len());
     println!("{} file sizes identified.", size_map.len());
-    let mut potential_dupes: HashMap<u64, Vec<PathBuf>> = HashMap::new();
-    let progress: ProgressBar = ProgressBar::new(size_map.len() as u64);
+    let progress: Arc<ProgressBar> = Arc::new(ProgressBar::new(size_map.len() as u64));
     progress.set_style(
         ProgressStyle::with_template("[{elapsed_precise}] [{bar:40.cyan/blue}] {pos}/{len} {msg}")
             .unwrap()
@@ -96,22 +103,25 @@ pub fn find_duplicates(dir: &Path) -> HashMap<u64, Vec<PathBuf>> {
     );
     progress.set_message("Computing quick hashes..");
     // Further filter files by quick hash
-    for (_size, files) in size_map.into_iter().filter(|(_, f)| f.len() > 1) {
+    let potential_dupes: HashMap<u64, Vec<PathBuf>> = size_map
+    .into_par_iter()
+    .filter(|(_, files)| files.len() > 1)
+    .flat_map_iter(|(_, files)| {
         let mut quick_hash_map: HashMap<u64, Vec<PathBuf>> = HashMap::new();
-        
         for file in files {
             if let Some(qh) = quick_hash(&file) {
-                quick_hash_map.entry(qh).or_default().push(file);  // Group by quick hash
+                quick_hash_map.entry(qh).or_default().push(file);
             }
         }
+        progress.inc(1); // Safe in Rayon
+        quick_hash_map
+            .into_iter()
+            .filter(|(_, group)| group.len() > 1)
+            .collect::<Vec<_>>() // (quick_hash, group)
+    })
+    .collect();
 
-        // Filter out groups with only one file, indicating no duplicates
-        for (_qh, group) in quick_hash_map.into_iter().filter(|(_, g)| g.len() > 1) {
-            potential_dupes.insert(_qh, group);  // Add groups with duplicates to potential duplicates
-        }
-        progress.inc(1);  // Update progress bar
-    }
-    progress.finish();  // Finish progress bar
+    progress.finish_with_message("Quick hashes complete.");
     info!("{} unique quick hashes identified.", potential_dupes.len());
     println!("{} unique quick hashes identified.", potential_dupes.len());
     let total_files = potential_dupes.values().map(Vec::len).sum::<usize>() as u64;
