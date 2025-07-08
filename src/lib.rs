@@ -6,11 +6,13 @@ use std::path::{Path, PathBuf};
 use walkdir::WalkDir;
 use twox_hash::XxHash64;
 use sha2::{Digest, Sha256};
-use indicatif::{ProgressBar};
+use indicatif::{ProgressBar,ProgressStyle};
 use fern::Dispatch;
 use log::{info};
 use chrono::{Local};
 use std::error::Error;
+use rayon::prelude::*;
+use std::sync::Arc;
 
 /// Initializes and configures logging for the application using the `fern` backend.
 ///
@@ -67,8 +69,13 @@ pub fn find_duplicates(dir: &Path) -> HashMap<u64, Vec<PathBuf>> {
 
     info!("{} files identified in {}", files.len(), dir.display());
     println!("{} files identified in {}", files.len(), dir.display());
-    println!("Sorting files by size...");
-    let progress = ProgressBar::new(files.len() as u64);
+    let progress: ProgressBar = ProgressBar::new(files.len() as u64);
+    progress.set_style(
+        ProgressStyle::with_template("[{elapsed_precise}] [{bar:40.cyan/blue}] {pos}/{len} {msg}")
+            .unwrap()
+            .progress_chars("█>-"),
+    );
+    progress.set_message("Indexing files by size...");
 
     // Loop over all files to collect them by size to quickly filter out non-duplicates.
     for file in &files {
@@ -80,9 +87,14 @@ pub fn find_duplicates(dir: &Path) -> HashMap<u64, Vec<PathBuf>> {
     progress.finish();  // Finish progress bar
     info!("{} file sizes identified.", size_map.len());
     println!("{} file sizes identified.", size_map.len());
-    println!("Computing quick hashes..");
     let mut potential_dupes: HashMap<u64, Vec<PathBuf>> = HashMap::new();
-    let progress = ProgressBar::new(size_map.len() as u64);
+    let progress: ProgressBar = ProgressBar::new(size_map.len() as u64);
+    progress.set_style(
+        ProgressStyle::with_template("[{elapsed_precise}] [{bar:40.cyan/blue}] {pos}/{len} {msg}")
+            .unwrap()
+            .progress_chars("█>-"),
+    );
+    progress.set_message("Computing quick hashes..");
     // Further filter files by quick hash
     for (_size, files) in size_map.into_iter().filter(|(_, f)| f.len() > 1) {
         let mut quick_hash_map: HashMap<u64, Vec<PathBuf>> = HashMap::new();
@@ -102,29 +114,38 @@ pub fn find_duplicates(dir: &Path) -> HashMap<u64, Vec<PathBuf>> {
     progress.finish();  // Finish progress bar
     info!("{} unique quick hashes identified.", potential_dupes.len());
     println!("{} unique quick hashes identified.", potential_dupes.len());
-    println!("Computing full hashes..");
-    let mut duplicates: HashMap<u64, Vec<PathBuf>> = HashMap::new();
     let total_files = potential_dupes.values().map(Vec::len).sum::<usize>() as u64;
-    let progress = ProgressBar::new(total_files);
+    let progress = Arc::new(ProgressBar::new(total_files));
+    progress.set_style(
+        ProgressStyle::with_template("[{elapsed_precise}] [{bar:40.cyan/blue}] {pos}/{len} {msg}")
+            .unwrap()
+            .progress_chars("█>-"),
+    );
+    progress.set_message("Computing full hashes...");
 
     // Final step: Perform full hashing (SHA-256) and group duplicates
-    for (_qh, files) in potential_dupes {
+    let duplicates: HashMap<u64, Vec<PathBuf>> = potential_dupes
+    .into_par_iter()
+    .flat_map_iter(|(_qh, files)| {
         let mut hash_map: HashMap<String, Vec<PathBuf>> = HashMap::new();
-        
         for file in files {
             if let Some(fh) = full_hash(&file) {
-                hash_map.entry(fh).or_default().push(file);  // Group by full hash
+                hash_map.entry(fh).or_default().push(file);
             }
-            progress.inc(1); // Update progress bar
+            progress.inc(1); // safe to call from rayon threads
         }
+        hash_map
+            .into_iter()
+            .filter(|(_, g)| g.len() > 1)
+            .map(|(_, group)| {
+                let size = fs::metadata(&group[0]).map(|m| m.len()).unwrap_or(0);
+                (size, group)
+            })
+            .collect::<Vec<_>>()
+    })
+    .collect();
 
-        // Only keep groups of files with the same hash (duplicates)
-        for (_fh, group) in hash_map.into_iter().filter(|(_, g)| g.len() > 1) {
-            let size = fs::metadata(&group[0]).ok().map(|m| m.len()).unwrap_or(0);
-            duplicates.insert(size, group);  // Store duplicates by size
-        }
-    }
-    progress.finish();  // Finish progress bar
+    progress.finish_with_message("Full hashes computed.");
 
     info!("{} duplicate files identified.", duplicates.len());
     duplicates  // Return the found duplicates
