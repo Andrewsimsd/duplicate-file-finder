@@ -67,7 +67,6 @@ pub fn setup_logger() -> Result<(), fern::InitError> {
 /// # Example
 /// ```
 /// use duplicate_file_finder::find_duplicates;
-/// use std::io::Write;
 /// use tempfile::tempdir;
 ///
 /// fn check() -> std::io::Result<()> {
@@ -83,17 +82,37 @@ pub fn find_duplicates(dir: &Path) -> HashMap<String, Vec<PathBuf>> {
     find_duplicates_in_dirs(&[dir.to_path_buf()])
 }
 
-/// Recursively scans the provided directories for duplicate files.
+/// Recursively scans the given directories for duplicate files.
 ///
-/// The process groups files by size, then by a quick hash, and finally by a full SHA-256 hash
-/// to identify true duplicates. Only files that match in size, quick hash, and full hash
-/// are considered duplicates.
+/// Files are grouped by size and a quick hash of their first 8 KiB before
+/// verifying equality with a full SHA‑256 hash. Only paths that match at every
+/// stage are returned.
 ///
 /// # Arguments
-/// * `dirs` - A slice of root paths to scan for duplicate files.
+/// * `dirs` - The directories to search for duplicates.
 ///
 /// # Returns
-/// A `HashMap` where the key is the SHA-256 hash of the file contents and the value is a `Vec<PathBuf>` containing paths to files with identical content.
+/// A map from SHA‑256 hash to a list of files sharing that hash.
+///
+/// # Example
+/// ```
+/// use duplicate_file_finder::find_duplicates_in_dirs;
+/// use tempfile::tempdir;
+/// use std::fs;
+///
+/// fn demo() -> std::io::Result<()> {
+///     let d1 = tempdir()?;
+///     let d2 = tempdir()?;
+///     fs::write(d1.path().join("a.txt"), b"same")?;
+///     fs::write(d2.path().join("b.txt"), b"same")?;
+///     let dupes = find_duplicates_in_dirs(&[
+///         d1.path().to_path_buf(),
+///         d2.path().to_path_buf(),
+///     ]);
+///     assert_eq!(dupes.values().next().unwrap().len(), 2);
+///     Ok(())
+/// }
+/// ```
 pub fn find_duplicates_in_dirs(dirs: &[PathBuf]) -> HashMap<String, Vec<PathBuf>> {
     let files: Vec<PathBuf> = dirs
         .iter()
