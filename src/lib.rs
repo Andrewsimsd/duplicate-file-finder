@@ -58,15 +58,35 @@ pub fn setup_logger() -> Result<(), fern::InitError> {
 /// A `HashMap` where the key is the SHA-256 hash of the file contents and the value is a `Vec<PathBuf>` containing paths to files with identical content.
 ///
 pub fn find_duplicates(dir: &Path) -> HashMap<String, Vec<PathBuf>> {
-    let files: Vec<PathBuf> = WalkDir::new(dir)  // Recursively walk through the directory
-        .into_iter()
-        .filter_map(Result::ok)
-        .filter(|entry| entry.path().is_file())  // Only consider files
-        .map(|entry| entry.path().to_path_buf())  // Collect file paths
+    find_duplicates_in_dirs(&[dir.to_path_buf()])
+}
+
+/// Recursively scans the provided directories for duplicate files.
+///
+/// The process groups files by size, then by a quick hash, and finally by a full SHA-256 hash
+/// to identify true duplicates. Only files that match in size, quick hash, and full hash
+/// are considered duplicates.
+///
+/// # Arguments
+/// * `dirs` - A slice of root paths to scan for duplicate files.
+///
+/// # Returns
+/// A `HashMap` where the key is the SHA-256 hash of the file contents and the value is a `Vec<PathBuf>` containing paths to files with identical content.
+pub fn find_duplicates_in_dirs(dirs: &[PathBuf]) -> HashMap<String, Vec<PathBuf>> {
+    let files: Vec<PathBuf> = dirs
+        .iter()
+        .flat_map(|dir| {
+            WalkDir::new(dir)
+                .into_iter()
+                .filter_map(Result::ok)
+                .filter(|entry| entry.path().is_file())
+                .map(|entry| entry.path().to_path_buf())
+                .collect::<Vec<_>>()
+        })
         .collect();
 
-    info!("{} files identified in {}", files.len(), dir.display());
-    println!("{} files identified in {}", files.len(), dir.display());
+    info!("{} files identified across {} directories", files.len(), dirs.len());
+    println!("{} files identified across {} directories", files.len(), dirs.len());
     let progress: Arc<ProgressBar> = Arc::new(ProgressBar::new(files.len() as u64));
     progress.set_style(
         ProgressStyle::with_template("[{elapsed_precise}] [{bar:40.cyan/blue}] {pos}/{len} {msg}")
@@ -392,6 +412,27 @@ mod tests {
         assert_eq!(duplicate_group.len(), 2);
         assert!(duplicate_group.contains(&file1));
         assert!(duplicate_group.contains(&file2));
+    }
+
+    #[test]
+    fn test_find_duplicates_in_dirs() {
+        let dir1 = tempdir().unwrap();
+        let dir2 = tempdir().unwrap();
+
+        let file1 = dir1.path().join("file1.txt");
+        let file2 = dir2.path().join("file2.txt");
+        let unique = dir2.path().join("unique.txt");
+
+        fs::write(&file1, "Duplicate content").unwrap();
+        fs::write(&file2, "Duplicate content").unwrap();
+        fs::write(&unique, "Unique content").unwrap();
+
+        let duplicates = find_duplicates_in_dirs(&vec![dir1.path().to_path_buf(), dir2.path().to_path_buf()]);
+        assert_eq!(duplicates.len(), 1);
+        let group = duplicates.values().next().unwrap();
+        assert_eq!(group.len(), 2);
+        assert!(group.contains(&file1));
+        assert!(group.contains(&file2));
     }
 
     #[test]

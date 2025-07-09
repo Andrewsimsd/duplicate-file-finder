@@ -94,3 +94,20 @@ fn report_contains_expected_duplicates() {
     assert!(content.contains("text_file (Copy).txt"));
     assert!(content.contains("1_GI-td9gs8D5OKZd19mAOqA.png"));
 }
+
+#[test]
+fn multiple_directories_scan() {
+    let tmp = tempdir().unwrap();
+    let input_dir1 = tmp.path().join("data1");
+    let input_dir2 = tmp.path().join("data2");
+    copy_dir_recursive(Path::new("resources"), &input_dir1).unwrap();
+    copy_dir_recursive(Path::new("resources"), &input_dir2).unwrap();
+
+    let output = run_with_args(
+        tmp.path(),
+        &["--directories", input_dir1.to_str().unwrap(), input_dir2.to_str().unwrap()],
+    );
+    assert!(output.status.success());
+    let report = tmp.path().join("duplicate_file_report.txt");
+    assert!(report.exists());
+}
