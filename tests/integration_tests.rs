@@ -8,14 +8,14 @@ fn copy_dir_recursive(src: &Path, dst: &Path) -> std::io::Result<()> {
     for entry in WalkDir::new(src) {
         let entry = entry?;
     let rel = entry.path().strip_prefix(src).expect("strip_prefix failed");
-        let dest = dst.join(rel);
+        let full_destination = dst.join(rel);
         if entry.file_type().is_dir() {
-            fs::create_dir_all(&dest)?;
+            fs::create_dir_all(&full_destination)?;
         } else {
-            if let Some(parent) = dest.parent() {
+            if let Some(parent) = full_destination.parent() {
                 fs::create_dir_all(parent)?;
             }
-            fs::copy(entry.path(), &dest)?;
+            fs::copy(entry.path(), &full_destination)?;
         }
     }
     Ok(())
