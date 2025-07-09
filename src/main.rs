@@ -4,7 +4,7 @@ use log::{error, info};
 use chrono::Local;
 use duplicate_file_finder::{setup_logger, find_duplicates, find_duplicates_in_dirs, write_output};
 
-const VERSION: &str = "0.1.2";
+const VERSION: &str = "0.1.4";
 const DEFAULT_REPORT_FILENAME: &str = "duplicate_file_report.txt";
 
 #[derive(Parser)]
