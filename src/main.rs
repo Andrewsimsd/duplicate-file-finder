@@ -88,8 +88,8 @@ fn main() {
                 info!("Duplicate file report saved to {}", output_file.display());
             }
             Err(e) => {
-                eprintln!("Error writing output: {}", e);
-                error!("Failed to write output: {}", e);
+                eprintln!("Error writing output: {e}");
+                error!("Failed to write output: {e}");
                 std::process::exit(1);
             }
         }
