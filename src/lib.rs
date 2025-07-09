@@ -55,10 +55,9 @@ pub fn setup_logger() -> Result<(), fern::InitError> {
 /// * `dir` - The root path to scan for duplicate files.
 ///
 /// # Returns
-/// A `HashMap` where the key is the file size (in bytes), and the value is a `Vec<PathBuf>`
-/// containing paths to duplicate files of that size.
+/// A `HashMap` where the key is the SHA-256 hash of the file contents and the value is a `Vec<PathBuf>` containing paths to files with identical content.
 ///
-pub fn find_duplicates(dir: &Path) -> HashMap<u64, Vec<PathBuf>> {
+pub fn find_duplicates(dir: &Path) -> HashMap<String, Vec<PathBuf>> {
     let files: Vec<PathBuf> = WalkDir::new(dir)  // Recursively walk through the directory
         .into_iter()
         .filter_map(Result::ok)
@@ -134,7 +133,7 @@ progress.finish_with_message("File sizes indexed.");
     progress.set_message("Computing full hashes...");
 
     // Final step: Perform full hashing (SHA-256) and group duplicates
-    let duplicates: HashMap<u64, Vec<PathBuf>> = potential_dupes
+    let duplicates: HashMap<String, Vec<PathBuf>> = potential_dupes
     .into_par_iter()
     .flat_map_iter(|(_qh, files)| {
         let mut hash_map: HashMap<String, Vec<PathBuf>> = HashMap::new();
@@ -147,10 +146,6 @@ progress.finish_with_message("File sizes indexed.");
         hash_map
             .into_iter()
             .filter(|(_, g)| g.len() > 1)
-            .map(|(_, group)| {
-                let size = fs::metadata(&group[0]).map(|m| m.len()).unwrap_or(0);
-                (size, group)
-            })
             .collect::<Vec<_>>()
     })
     .collect();
@@ -170,8 +165,8 @@ progress.finish_with_message("File sizes indexed.");
 ///
 /// # Arguments
 ///
-/// * `duplicates` - A map where each key is a file size in bytes and the value is a list of file paths
-///                  that are duplicates (i.e., files with the same content and size).
+/// * `duplicates` - A map where each key is a SHA-256 hash and the value is a list of file paths
+///                  that share that hash (i.e., files with the same content).
 /// * `output_file` - The path to the output file where the report should be written.
 /// * `start_time` - A string representing the start time of the operation (usually formatted as `YYYYMMDD HH:MM:SS`).
 /// * `base_dir` - The base directory where the duplicate search was initiated. This is included in the report header.
@@ -195,7 +190,7 @@ progress.finish_with_message("File sizes indexed.");
 /// fn example_usage() -> Result<(), Box<dyn std::error::Error>> {
 ///     let mut duplicates = HashMap::new();
 ///     duplicates.insert(
-///         1024,
+///         String::from("somehash"),
 ///         vec![PathBuf::from("/tmp/file1.txt"), PathBuf::from("/tmp/file2.txt")],
 ///     );
 ///
@@ -209,12 +204,18 @@ progress.finish_with_message("File sizes indexed.");
 /// ```
 /// 
 pub fn write_output(
-    duplicates: HashMap<u64, Vec<PathBuf>>,
+    duplicates: HashMap<String, Vec<PathBuf>>,
     output_file: &str,
     start_time: &str,
     base_dir: &Path,
 ) -> Result<(), Box<dyn Error>> {
-    let mut entries: Vec<(u64, Vec<PathBuf>)> = duplicates.into_iter().collect();
+    let mut entries: Vec<(u64, Vec<PathBuf>)> = duplicates
+        .into_iter()
+        .map(|(_, paths)| {
+            let size = fs::metadata(&paths[0]).map(|m| m.len()).unwrap_or(0);
+            (size, paths)
+        })
+        .collect();
     entries.sort_by(|a, b| b.0.cmp(&a.0)); // Sort by file size descending
 
     let username = whoami::username();
@@ -405,7 +406,7 @@ mod tests {
 
         let mut duplicates = HashMap::new();
         duplicates.insert(
-            file1.metadata().unwrap().len(),
+            "dummy_hash".to_string(),
             vec![file1.clone(), file2.clone()],
         );
 
@@ -421,5 +422,4 @@ mod tests {
         assert!(output.contains("Duplicate File Finder Report"));
         assert!(output.contains(file1.to_str().unwrap()));
         assert!(output.contains(file2.to_str().unwrap()));
-    }
-}
+    }}
