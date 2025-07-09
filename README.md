@@ -90,7 +90,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     setup_logger()?;
     let base_dir = Path::new("/some/path");
     let duplicates = find_duplicates(base_dir);
-    write_output(duplicates, "report.txt", "20250707 15:00:00", base_dir)?;
+    write_output(duplicates, "report.txt", "20250707 15:00:00", &[base_dir.to_path_buf()])?;
     Ok(())
 }
 ```

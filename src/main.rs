@@ -38,11 +38,6 @@ fn main() {
     } else {
         vec![cli.directory.clone().unwrap()]
     };
-    let base_dir = if dirs.len() == 1 {
-        dirs[0].clone()
-    } else {
-        PathBuf::from("multiple directories")
-    };
 
     let mut output_file = cli
         .output
@@ -80,7 +75,7 @@ fn main() {
         println!("No duplicate files found.");
         info!("No duplicate files found.");
     } else {
-        match write_output(duplicates, output_file.to_str().unwrap(), &start_time, &base_dir) {
+        match write_output(duplicates, output_file.to_str().unwrap(), &start_time, &dirs) {
             Ok(()) => {
                 println!("Duplicate file report saved to {}", output_file.display());
                 info!("Duplicate file report saved to {}", output_file.display());

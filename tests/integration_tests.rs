@@ -110,4 +110,7 @@ fn multiple_directories_scan() {
     assert!(output.status.success());
     let report = tmp.path().join("duplicate_file_report.txt");
     assert!(report.exists());
+    let content = fs::read_to_string(&report).unwrap();
+    assert!(content.contains(input_dir1.to_str().unwrap()));
+    assert!(content.contains(input_dir2.to_str().unwrap()));
 }
