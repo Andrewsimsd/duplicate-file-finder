@@ -25,9 +25,11 @@ jobs:
 
     steps:
     - uses: actions/checkout@v4
+    - name: Install clippy
+      run: rustup component add clippy
     - name: Run tests
       run: cargo test --verbose
-    #- name: Check for warnings
-    #  run: cargo clippy --all-targets --all-features -- -D warnings
+    - name: Clippy pedantic
+      run: cargo clippy --all-targets --all-features -- -D warnings -W clippy::pedantic
     - name: Doc tests
       run: cargo test --doc
