@@ -222,11 +222,11 @@ progress.finish_with_message("File sizes indexed.");
 /// # Arguments
 ///
 /// * `duplicates` - A map where each key is a SHA-256 hash and the value is a list of file paths
-///                  that share that hash (i.e., files with the same content).
+///  that share that hash (i.e., files with the same content).
 /// * `output_file` - The path to the output file where the report should be written.
 /// * `start_time` - A string representing the start time of the operation (usually formatted as `YYYYMMDD HH:MM:SS`).
 /// * `base_dirs` - The directory or directories searched for duplicates. Each will be
-///                 listed in the report header.
+///  listed in the report header.
 ///
 /// # Returns
 ///
@@ -311,7 +311,7 @@ pub fn write_output<S: ::std::hash::BuildHasher>(
         writeln!(writer)?;
     }
 
-    info!("Duplicate files saved to {}", output_file);
+    info!("Duplicate files saved to {output_file}");
     Ok(())
 }
 
@@ -478,7 +478,7 @@ mod tests {
         fs::write(&file2, "Duplicate content").expect("write file");
         fs::write(&unique, "Unique content").expect("write file");
 
-        let duplicates = find_duplicates_in_dirs(&vec![dir1.path().to_path_buf(), dir2.path().to_path_buf()]);
+        let duplicates = find_duplicates_in_dirs(&[dir1.path().to_path_buf(), dir2.path().to_path_buf()]);
         assert_eq!(duplicates.len(), 1);
         let group = duplicates.values().next().expect("duplicates");
         assert_eq!(group.len(), 2);
