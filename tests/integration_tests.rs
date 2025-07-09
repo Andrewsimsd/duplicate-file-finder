@@ -7,7 +7,7 @@ use walkdir::WalkDir;
 fn copy_dir_recursive(src: &Path, dst: &Path) -> std::io::Result<()> {
     for entry in WalkDir::new(src) {
         let entry = entry?;
-        let rel = entry.path().strip_prefix(src).unwrap();
+    let rel = entry.path().strip_prefix(src).expect("strip_prefix failed");
         let dest = dst.join(rel);
         if entry.file_type().is_dir() {
             fs::create_dir_all(&dest)?;
@@ -32,40 +32,54 @@ fn run_with_args(dir: &Path, args: &[&str]) -> std::process::Output {
 
 #[test]
 fn default_output_file_generated() {
-    let tmp = tempdir().unwrap();
+    let tmp = tempdir().expect("create temp dir");
     let input_dir = tmp.path().join("data");
-    copy_dir_recursive(Path::new("resources"), &input_dir).unwrap();
+    copy_dir_recursive(Path::new("resources"), &input_dir).expect("copy resources");
 
-    let output = run_with_args(tmp.path(), &[input_dir.to_str().unwrap()]);
+    let output = run_with_args(tmp.path(), &[input_dir.to_str().expect("valid UTF-8")]);
     assert!(output.status.success());
 
     let report = tmp.path().join("duplicate_file_report.txt");
     assert!(report.exists());
-    let content = fs::read_to_string(report).unwrap();
+    let content = fs::read_to_string(report).expect("read report");
     assert!(content.contains("Duplicate File Finder Report"));
 }
 
 #[test]
 fn output_file_argument_creates_file() {
-    let tmp = tempdir().unwrap();
+    let tmp = tempdir().expect("create temp dir");
     let input_dir = tmp.path().join("data");
-    copy_dir_recursive(Path::new("resources"), &input_dir).unwrap();
+    copy_dir_recursive(Path::new("resources"), &input_dir).expect("copy resources");
 
     let report = tmp.path().join("my_report.txt");
-    let output = run_with_args(tmp.path(), &[input_dir.to_str().unwrap(), "--output", report.to_str().unwrap()]);
+    let output = run_with_args(
+        tmp.path(),
+        &[
+            input_dir.to_str().expect("valid UTF-8"),
+            "--output",
+            report.to_str().expect("valid UTF-8"),
+        ],
+    );
     assert!(output.status.success());
     assert!(report.exists());
 }
 
 #[test]
 fn output_directory_argument_creates_report_in_directory() {
-    let tmp = tempdir().unwrap();
+    let tmp = tempdir().expect("create temp dir");
     let input_dir = tmp.path().join("data");
-    copy_dir_recursive(Path::new("resources"), &input_dir).unwrap();
+    copy_dir_recursive(Path::new("resources"), &input_dir).expect("copy resources");
 
     let out_dir = tmp.path().join("reports");
-    fs::create_dir(&out_dir).unwrap();
-    let output = run_with_args(tmp.path(), &[input_dir.to_str().unwrap(), "--output", out_dir.to_str().unwrap()]);
+    fs::create_dir(&out_dir).expect("create output dir");
+    let output = run_with_args(
+        tmp.path(),
+        &[
+            input_dir.to_str().expect("valid UTF-8"),
+            "--output",
+            out_dir.to_str().expect("valid UTF-8"),
+        ],
+    );
     assert!(output.status.success());
 
     let report = out_dir.join("duplicate_file_report.txt");
@@ -74,22 +88,22 @@ fn output_directory_argument_creates_report_in_directory() {
 
 #[test]
 fn invalid_directory_returns_error() {
-    let tmp = tempdir().unwrap();
+    let tmp = tempdir().expect("create temp dir");
     let bad_dir = tmp.path().join("does_not_exist");
-    let output = run_with_args(tmp.path(), &[bad_dir.to_str().unwrap()]);
+    let output = run_with_args(tmp.path(), &[bad_dir.to_str().expect("valid UTF-8")]);
     assert!(!output.status.success());
 }
 
 #[test]
 fn report_contains_expected_duplicates() {
-    let tmp = tempdir().unwrap();
+    let tmp = tempdir().expect("create temp dir");
     let input_dir = tmp.path().join("data");
-    copy_dir_recursive(Path::new("resources"), &input_dir).unwrap();
+    copy_dir_recursive(Path::new("resources"), &input_dir).expect("copy resources");
 
-    let output = run_with_args(tmp.path(), &[input_dir.to_str().unwrap()]);
+    let output = run_with_args(tmp.path(), &[input_dir.to_str().expect("valid UTF-8")]);
     assert!(output.status.success());
     let report = tmp.path().join("duplicate_file_report.txt");
-    let content = fs::read_to_string(report).unwrap();
+    let content = fs::read_to_string(report).expect("read report");
     assert!(content.contains("text_file.txt"));
     assert!(content.contains("text_file (Copy).txt"));
     assert!(content.contains("1_GI-td9gs8D5OKZd19mAOqA.png"));
@@ -97,20 +111,24 @@ fn report_contains_expected_duplicates() {
 
 #[test]
 fn multiple_directories_scan() {
-    let tmp = tempdir().unwrap();
+    let tmp = tempdir().expect("create temp dir");
     let input_dir1 = tmp.path().join("data1");
     let input_dir2 = tmp.path().join("data2");
-    copy_dir_recursive(Path::new("resources"), &input_dir1).unwrap();
-    copy_dir_recursive(Path::new("resources"), &input_dir2).unwrap();
+    copy_dir_recursive(Path::new("resources"), &input_dir1).expect("copy resources");
+    copy_dir_recursive(Path::new("resources"), &input_dir2).expect("copy resources");
 
     let output = run_with_args(
         tmp.path(),
-        &["--directories", input_dir1.to_str().unwrap(), input_dir2.to_str().unwrap()],
+        &[
+            "--directories",
+            input_dir1.to_str().expect("valid UTF-8"),
+            input_dir2.to_str().expect("valid UTF-8"),
+        ],
     );
     assert!(output.status.success());
     let report = tmp.path().join("duplicate_file_report.txt");
     assert!(report.exists());
-    let content = fs::read_to_string(&report).unwrap();
-    assert!(content.contains(input_dir1.to_str().unwrap()));
-    assert!(content.contains(input_dir2.to_str().unwrap()));
+    let content = fs::read_to_string(&report).expect("read report");
+    assert!(content.contains(input_dir1.to_str().expect("valid UTF-8")));
+    assert!(content.contains(input_dir2.to_str().expect("valid UTF-8")));
 }

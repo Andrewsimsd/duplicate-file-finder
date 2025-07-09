@@ -80,6 +80,7 @@ pub fn setup_logger() -> Result<(), fern::InitError> {
 ///     Ok(())
 /// }
 /// ```
+#[must_use]
 pub fn find_duplicates(dir: &Path) -> HashMap<String, Vec<PathBuf>> {
     find_duplicates_in_dirs(&[dir.to_path_buf()])
 }
@@ -115,6 +116,8 @@ pub fn find_duplicates(dir: &Path) -> HashMap<String, Vec<PathBuf>> {
 ///     Ok(())
 /// }
 /// ```
+#[allow(clippy::module_name_repetitions)]
+#[must_use]
 pub fn find_duplicates_in_dirs(dirs: &[PathBuf]) -> HashMap<String, Vec<PathBuf>> {
     let files: Vec<PathBuf> = dirs
         .iter()
@@ -332,6 +335,7 @@ pub fn write_output(
 /// # Returns
 /// A `String` representing the size in the most appropriate unit (bytes, KB, MB, GB, or TB).
 ///
+#[must_use]
 fn format_size(size: u64) -> String {
     const KB: u64 = 1024;
     const MB: u64 = KB * 1024;
@@ -426,10 +430,10 @@ mod tests {
 
     #[test]
     fn test_quick_hash() {
-        let dir = tempdir().unwrap();
+        let dir = tempdir().expect("create temp dir");
         let file_path = dir.path().join("test_file.txt");
-        let mut file = File::create(&file_path).unwrap();
-        writeln!(file, "Hello, world!").unwrap();
+        let mut file = File::create(&file_path).expect("create file");
+        writeln!(file, "Hello, world!").expect("write file");
 
         let hash = quick_hash(&file_path);
         assert!(hash.is_some());
@@ -437,35 +441,35 @@ mod tests {
 
     #[test]
     fn test_full_hash() {
-        let dir = tempdir().unwrap();
+        let dir = tempdir().expect("create temp dir");
         let file_path = dir.path().join("test_file.txt");
-        let mut file = File::create(&file_path).unwrap();
-        writeln!(file, "Hello, world!").unwrap();
+        let mut file = File::create(&file_path).expect("create file");
+        writeln!(file, "Hello, world!").expect("write file");
 
         let hash = full_hash(&file_path);
         assert!(hash.is_some());
         assert_eq!(
-            hash.unwrap(),
+            hash.expect("hash exists"),
             "d9014c4624844aa5bac314773d6b689ad467fa4e1d1a50a1b8a99d5a95f72ff5"
         ); // Precomputed SHA-256 of "Hello, world!\n"
     }
 
     #[test]
     fn test_find_duplicates() {
-        let dir = tempdir().unwrap();
+        let dir = tempdir().expect("create temp dir");
 
         // Create some duplicate files
         let file1 = dir.path().join("file1.txt");
         let file2 = dir.path().join("file2.txt");
         let unique_file = dir.path().join("unique.txt");
 
-        fs::write(&file1, "Duplicate content").unwrap();
-        fs::write(&file2, "Duplicate content").unwrap();
-        fs::write(&unique_file, "Unique content").unwrap();
+        fs::write(&file1, "Duplicate content").expect("write file");
+        fs::write(&file2, "Duplicate content").expect("write file");
+        fs::write(&unique_file, "Unique content").expect("write file");
 
         let duplicates = find_duplicates(dir.path());
         assert_eq!(duplicates.len(), 1); // Only one group of duplicates
-        let duplicate_group = duplicates.values().next().unwrap();
+        let duplicate_group = duplicates.values().next().expect("duplicates");
         assert_eq!(duplicate_group.len(), 2);
         assert!(duplicate_group.contains(&file1));
         assert!(duplicate_group.contains(&file2));
@@ -473,20 +477,20 @@ mod tests {
 
     #[test]
     fn test_find_duplicates_in_dirs() {
-        let dir1 = tempdir().unwrap();
-        let dir2 = tempdir().unwrap();
+        let dir1 = tempdir().expect("create temp dir");
+        let dir2 = tempdir().expect("create temp dir");
 
         let file1 = dir1.path().join("file1.txt");
         let file2 = dir2.path().join("file2.txt");
         let unique = dir2.path().join("unique.txt");
 
-        fs::write(&file1, "Duplicate content").unwrap();
-        fs::write(&file2, "Duplicate content").unwrap();
-        fs::write(&unique, "Unique content").unwrap();
+        fs::write(&file1, "Duplicate content").expect("write file");
+        fs::write(&file2, "Duplicate content").expect("write file");
+        fs::write(&unique, "Unique content").expect("write file");
 
         let duplicates = find_duplicates_in_dirs(&vec![dir1.path().to_path_buf(), dir2.path().to_path_buf()]);
         assert_eq!(duplicates.len(), 1);
-        let group = duplicates.values().next().unwrap();
+        let group = duplicates.values().next().expect("duplicates");
         assert_eq!(group.len(), 2);
         assert!(group.contains(&file1));
         assert!(group.contains(&file2));
@@ -494,13 +498,13 @@ mod tests {
 
     #[test]
     fn test_write_output() {
-        let dir = tempdir().unwrap();
+        let dir = tempdir().expect("create temp dir");
 
         // Create some files and simulate duplicates
         let file1 = dir.path().join("file1.txt");
         let file2 = dir.path().join("file2.txt");
-        fs::write(&file1, "Duplicate content").unwrap();
-        fs::write(&file2, "Duplicate content").unwrap();
+        fs::write(&file1, "Duplicate content").expect("write file");
+        fs::write(&file2, "Duplicate content").expect("write file");
 
         let mut duplicates = HashMap::new();
         duplicates.insert(
@@ -511,12 +515,11 @@ mod tests {
         let output_file = dir.path().join("output.txt");
         let _res = write_output(
             duplicates,
-            output_file.to_str().unwrap(),
+            output_file.to_str().expect("valid UTF-8 path"),
             "20250101 12:00:00",
             &[dir.path().to_path_buf()],
         );
 
-        let output = fs::read_to_string(&output_file).unwrap();
-        assert!(output.contains("Duplicate File Finder Report"));
-        assert!(output.contains(file1.to_str().unwrap()));
-        assert!(output.contains(file2.to_str().unwrap()));    }}
+        let output = fs::read_to_string(&output_file).expect("read file");
+        assert!(output.contains("Duplicate File Finder Report"));        assert!(output.contains(file1.to_str().expect("valid UTF-8")));
+        assert!(output.contains(file2.to_str().expect("valid UTF-8")));    }}
