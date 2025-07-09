@@ -1,4 +1,4 @@
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use clap::Parser;
 use log::{error, info};
 use chrono::Local;
@@ -8,10 +8,10 @@ const VERSION: &str = "0.1.2";
 const DEFAULT_REPORT_FILENAME: &str = "duplicate_file_report.txt";
 
 #[derive(Parser)]
-#[command(version = VERSION, about = "Scans the specified directory recursively for duplicate files.")]
+#[command(author, version = VERSION, about = "Scans the specified directory recursively for duplicate files.")]
 struct Cli {
     /// Directory to scan for duplicates
-    directory: String,
+    directory: PathBuf,
 
     /// Output file or directory for the report
     #[arg(short, long, value_name = "FILE")]
@@ -23,7 +23,7 @@ fn main() {
 
     let cli = Cli::parse();
 
-    let dir = Path::new(&cli.directory);
+    let dir = &cli.directory;
     let mut output_file = cli
         .output
         .unwrap_or_else(|| PathBuf::from(DEFAULT_REPORT_FILENAME));
@@ -40,7 +40,7 @@ fn main() {
     let start_time = Local::now().format("%Y%m%d %H:%M:%S").to_string();
 
     println!("Scanning directory: {}", dir.display());
-    println!("Output will be saved to: {}", output_file);
+    println!("Output will be saved to: {}", output_file.display());
     info!("Starting duplicate file detection in {}", dir.display());
 
     let duplicates = find_duplicates(dir);
@@ -49,10 +49,10 @@ fn main() {
         println!("No duplicate files found.");
         info!("No duplicate files found.");
     } else {
-        match write_output(duplicates, &output_file, &start_time, dir) {
+        match write_output(duplicates, output_file.to_str().unwrap(), &start_time, dir) {
             Ok(()) => {
-                println!("Duplicate file report saved to {}", output_file);
-                info!("Duplicate file report saved to {}", output_file);
+                println!("Duplicate file report saved to {}", output_file.display());
+                info!("Duplicate file report saved to {}", output_file.display());
             }
             Err(e) => {
                 eprintln!("Error writing output: {}", e);
