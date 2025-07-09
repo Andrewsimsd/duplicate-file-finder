@@ -1,3 +1,5 @@
+#![warn(clippy::pedantic)]
+
 use std::collections::HashMap;
 use std::fs::{self, File};
 use std::hash::Hasher;
@@ -131,7 +133,7 @@ pub fn find_duplicates_in_dirs(dirs: &[PathBuf]) -> HashMap<String, Vec<PathBuf>
     let progress: Arc<ProgressBar> = Arc::new(ProgressBar::new(files.len() as u64));
     progress.set_style(
         ProgressStyle::with_template("[{elapsed_precise}] [{bar:40.cyan/blue}] {pos}/{len} {msg}")
-            .unwrap()
+            .expect("valid progress template")
             .progress_chars("█>-"),
     );
     progress.set_message("Indexing files by size...");
@@ -158,7 +160,7 @@ progress.finish_with_message("File sizes indexed.");
     let progress: Arc<ProgressBar> = Arc::new(ProgressBar::new(size_map.len() as u64));
     progress.set_style(
         ProgressStyle::with_template("[{elapsed_precise}] [{bar:40.cyan/blue}] {pos}/{len} {msg}")
-            .unwrap()
+            .expect("valid progress template")
             .progress_chars("█>-"),
     );
     progress.set_message("Computing quick hashes..");
@@ -188,7 +190,7 @@ progress.finish_with_message("File sizes indexed.");
     let progress = Arc::new(ProgressBar::new(total_files));
     progress.set_style(
         ProgressStyle::with_template("[{elapsed_precise}] [{bar:40.cyan/blue}] {pos}/{len} {msg}")
-            .unwrap()
+            .expect("valid progress template")
             .progress_chars("█>-"),
     );
     progress.set_message("Computing full hashes...");
@@ -359,11 +361,14 @@ fn format_size(size: u64) -> String {
 /// # Returns
 /// An `Option<u64>` containing the hash value, or `None` if the file couldn't be read.
 ///
+const QUICK_HASH_SIZE: usize = 8 * 1024;
+
+#[must_use]
 fn quick_hash(file_path: &Path) -> Option<u64> {
     let mut hasher = XxHash64::with_seed(0);
     let file = File::open(file_path).ok()?;
     let mut reader = BufReader::new(file);
-    let mut buffer = [0; 8192];
+    let mut buffer = [0; QUICK_HASH_SIZE];
     let bytes_read = reader.read(&mut buffer).ok()?;
     
     hasher.write(&buffer[..bytes_read]);
@@ -382,11 +387,14 @@ fn quick_hash(file_path: &Path) -> Option<u64> {
 /// An `Option<String>` with the lowercase hex representation of the SHA-256 hash,
 /// or `None` if the file could not be read.
 ///
+const FULL_HASH_BUFFER_SIZE: usize = 64 * 1024;
+
+#[must_use]
 fn full_hash(file_path: &Path) -> Option<String> {
     let file = File::open(file_path).ok()?;
     let mut reader = BufReader::new(file);
     let mut hasher = Sha256::new();
-    let mut buffer = [0; 65536];
+    let mut buffer = [0; FULL_HASH_BUFFER_SIZE];
 
     while let Ok(bytes_read) = reader.read(&mut buffer) {
         if bytes_read == 0 { break; }

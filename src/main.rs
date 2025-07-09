@@ -1,3 +1,5 @@
+#![warn(clippy::pedantic)]
+
 use std::path::PathBuf;
 use clap::{Parser, ArgGroup};
 use log::{error, info};
@@ -36,7 +38,7 @@ fn main() {
     let dirs: Vec<PathBuf> = if let Some(multi) = cli.directories.clone() {
         multi
     } else {
-        vec![cli.directory.clone().unwrap()]
+        vec![cli.directory.clone().expect("a directory path is required")] 
     };
 
     let mut output_file = cli
@@ -75,7 +77,12 @@ fn main() {
         println!("No duplicate files found.");
         info!("No duplicate files found.");
     } else {
-        match write_output(duplicates, output_file.to_str().unwrap(), &start_time, &dirs) {
+        match write_output(
+            duplicates,
+            output_file.to_str().expect("valid UTF-8 path"),
+            &start_time,
+            &dirs,
+        ) {
             Ok(()) => {
                 println!("Duplicate file report saved to {}", output_file.display());
                 info!("Duplicate file report saved to {}", output_file.display());
