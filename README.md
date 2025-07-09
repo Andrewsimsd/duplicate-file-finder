@@ -41,6 +41,7 @@ cargo install duplicate_file_finder
 
 ```bash
 duplicate_file_finder <directory> [--output <file_or_directory>]
+duplicate_file_finder --directories <dir1> <dir2> ... [--output <file_or_directory>]
 ```
 
 #### Example
@@ -57,6 +58,7 @@ This scans `~/Documents` and writes a human-readable report to `reports/duplicat
 | ----------------- | ----------------------------------------------- |
 | `-h`, `--help`    | Show help message                               |
 | `--output <path>` | Specify output file or directory for the report |
+| `-d`, `--directories <DIR>` | Scan multiple directories as a single pool |
 
 If the output path is a directory, the report is saved as `duplicate_file_report.txt` within that directory.
 
@@ -88,7 +90,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     setup_logger()?;
     let base_dir = Path::new("/some/path");
     let duplicates = find_duplicates(base_dir);
-    write_output(duplicates, "report.txt", "20250707 15:00:00", base_dir)?;
+    write_output(duplicates, "report.txt", "20250707 15:00:00", &[base_dir.to_path_buf()])?;
     Ok(())
 }
 ```
