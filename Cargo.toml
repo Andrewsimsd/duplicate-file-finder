@@ -25,4 +25,5 @@ rayon = "1"
 clap = { version = "4", features = ["derive"] }
 dialoguer = "0.10"
 
-[dev-dependencies]tempfile = "3.15.0"
+[dev-dependencies]
+tempfile = "3.15.0"
