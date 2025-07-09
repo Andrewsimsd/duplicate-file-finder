@@ -222,11 +222,11 @@ progress.finish_with_message("File sizes indexed.");
 /// # Arguments
 ///
 /// * `duplicates` - A map where each key is a SHA-256 hash and the value is a list of file paths
-///  that share that hash (i.e., files with the same content).
+///   that share that hash (i.e., files with the same content).
 /// * `output_file` - The path to the output file where the report should be written.
 /// * `start_time` - A string representing the start time of the operation (usually formatted as `YYYYMMDD HH:MM:SS`).
 /// * `base_dirs` - The directory or directories searched for duplicates. Each will be
-///  listed in the report header.
+///   listed in the report header.
 ///
 /// # Returns
 ///
