@@ -14,18 +14,25 @@ use std::error::Error;
 use rayon::prelude::*;
 use std::sync::Arc;
 
-/// Initializes and configures logging for the application using the `fern` backend.
+/// Initializes logging for the library and command line tool.
 ///
-/// Logs are written to a file named `duplicate_finder.log` with timestamps and log levels.
-/// This function should be called before any logging takes place.
+/// The logger records messages to a file called `duplicate_finder.log` and
+/// formats each entry with a timestamp and log level. Call this once near the
+/// start of your program before emitting any log messages.
 ///
 /// # Errors
-/// Returns a `fern::InitError` if the logger fails to initialize.
+/// Returns a [`fern::InitError`] if the logger fails to initialize.
 ///
 /// # Example
 /// ```
-/// use duplicate_file_finder::{setup_logger};
-/// setup_logger().expect("Failed to initialize logger");
+/// use duplicate_file_finder::setup_logger;
+/// use log::info;
+///
+/// fn init() -> Result<(), fern::InitError> {
+///     setup_logger()?;
+///     info!("logging ready");
+///     Ok(())
+/// }
 /// ```
 #[must_use]
 pub fn setup_logger() -> Result<(), fern::InitError> {
@@ -47,31 +54,65 @@ pub fn setup_logger() -> Result<(), fern::InitError> {
 
 /// Recursively scans the provided directory for duplicate files.
 ///
-/// The process groups files by size, then by a quick hash, and finally by a full SHA-256 hash
-/// to identify true duplicates. Only files that match in size, quick hash, and full hash
-/// are considered duplicates.
+/// Files are grouped by size, then by a quick non-cryptographic hash and
+/// finally by a full SHA-256 hash. Only files matching at every stage are
+/// returned as duplicates.
 ///
 /// # Arguments
 /// * `dir` - The root path to scan for duplicate files.
 ///
 /// # Returns
-/// A `HashMap` where the key is the SHA-256 hash of the file contents and the value is a `Vec<PathBuf>` containing paths to files with identical content.
+/// A map from SHA‑256 hash to a list of files sharing that hash.
 ///
+/// # Example
+/// ```
+/// use duplicate_file_finder::find_duplicates;
+/// use tempfile::tempdir;
+///
+/// fn check() -> std::io::Result<()> {
+///     let dir = tempdir()?;
+///     std::fs::write(dir.path().join("a.txt"), b"same")?;
+///     std::fs::write(dir.path().join("b.txt"), b"same")?;
+///     let dupes = find_duplicates(dir.path());
+///     assert_eq!(dupes.values().next().unwrap().len(), 2);
+///     Ok(())
+/// }
+/// ```
 pub fn find_duplicates(dir: &Path) -> HashMap<String, Vec<PathBuf>> {
     find_duplicates_in_dirs(&[dir.to_path_buf()])
 }
 
-/// Recursively scans the provided directories for duplicate files.
+/// Recursively scans the given directories for duplicate files.
 ///
-/// The process groups files by size, then by a quick hash, and finally by a full SHA-256 hash
-/// to identify true duplicates. Only files that match in size, quick hash, and full hash
-/// are considered duplicates.
+/// Files are grouped by size and a quick hash of their first 8 KiB before
+/// verifying equality with a full SHA‑256 hash. Only paths that match at every
+/// stage are returned.
 ///
 /// # Arguments
-/// * `dirs` - A slice of root paths to scan for duplicate files.
+/// * `dirs` - The directories to search for duplicates.
 ///
 /// # Returns
-/// A `HashMap` where the key is the SHA-256 hash of the file contents and the value is a `Vec<PathBuf>` containing paths to files with identical content.
+/// A map from SHA‑256 hash to a list of files sharing that hash.
+///
+/// # Example
+/// ```
+/// use duplicate_file_finder::find_duplicates_in_dirs;
+/// use tempfile::tempdir;
+/// use std::fs;
+///
+/// fn demo() -> std::io::Result<()> {
+///     let d1 = tempdir()?;
+///     let d2 = tempdir()?;
+///     fs::write(d1.path().join("a.txt"), b"same")?;
+///     fs::write(d2.path().join("b.txt"), b"same")?;
+///     let dupes = find_duplicates_in_dirs(&[
+///         d1.path().to_path_buf(),
+///         d2.path().to_path_buf(),
+///     ]);
+///     assert_eq!(dupes.values().next().unwrap().len(), 2);
+///     Ok(())
+/// }
+/// ```
 pub fn find_duplicates_in_dirs(dirs: &[PathBuf]) -> HashMap<String, Vec<PathBuf>> {
     let files: Vec<PathBuf> = dirs
         .iter()
