@@ -6,7 +6,7 @@ use duplicate_file_finder::{find_duplicates, find_duplicates_in_dirs, setup_logg
 use log::{error, info};
 use std::path::PathBuf;
 
-const VERSION: &str = "0.1.4";
+const VERSION: &str = env!("CARGO_PKG_VERSION");
 const DEFAULT_REPORT_FILENAME: &str = "duplicate_file_report.txt";
 
 #[derive(Parser)]
