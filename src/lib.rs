@@ -1,20 +1,19 @@
 #![warn(clippy::pedantic)]
 
+use chrono::Local;
+use fern::Dispatch;
+use indicatif::{ProgressBar, ProgressStyle};
+use log::info;
+use rayon::prelude::*;
+use sha2::{Digest, Sha256};
 use std::collections::HashMap;
+use std::error::Error;
 use std::fs::{self, File};
 use std::hash::Hasher;
-use std::io::{BufReader, Read, Write, BufWriter};
+use std::io::{BufReader, BufWriter, Read, Write};
 use std::path::{Path, PathBuf};
-use walkdir::WalkDir;
 use twox_hash::XxHash64;
-use sha2::{Digest, Sha256};
-use indicatif::{ProgressBar,ProgressStyle};
-use fern::Dispatch;
-use log::{info};
-use chrono::{Local};
-use std::error::Error;
-use rayon::prelude::*;
-use std::sync::Arc;
+use walkdir::WalkDir;
 
 /// Initializes logging for the library and command line tool.
 ///
@@ -51,7 +50,6 @@ pub fn setup_logger() -> Result<(), fern::InitError> {
         .apply()?;
     Ok(())
 }
-
 
 /// Recursively scans the provided directory for duplicate files.
 ///
@@ -118,11 +116,41 @@ pub fn find_duplicates(dir: &Path) -> HashMap<String, Vec<PathBuf>> {
 #[allow(clippy::module_name_repetitions)]
 #[must_use]
 pub fn find_duplicates_in_dirs(dirs: &[PathBuf]) -> HashMap<String, Vec<PathBuf>> {
-    let progress_style = ProgressStyle::with_template("[{elapsed_precise}] [{bar:40.cyan/blue}] {pos}/{len} {msg}")
-    .unwrap_or_else(|_| ProgressStyle::default_bar())
-    .progress_chars("█>-");
-    let files: Vec<PathBuf> = dirs
-        .iter()
+    let style =
+        ProgressStyle::with_template("[{elapsed_precise}] [{bar:40.cyan/blue}] {pos}/{len} {msg}")
+            .unwrap_or_else(|_| ProgressStyle::default_bar())
+            .progress_chars("█>-");
+
+    let files = collect_files(dirs);
+    info!(
+        "{} files identified across {} directories",
+        files.len(),
+        dirs.len()
+    );
+    println!(
+        "{} files identified across {} directories",
+        files.len(),
+        dirs.len()
+    );
+
+    let by_size = group_by_size(&files, &style);
+    let by_quick_hash = group_by_quick_hash(by_size, &style);
+    let duplicates = group_by_full_hash(by_quick_hash, &style);
+
+    info!("{} duplicate files identified.", duplicates.len());
+    duplicates
+}
+
+/// Walks all provided directories and returns a flat list of file paths.
+///
+/// # Arguments
+/// * `dirs` - Directories to traverse recursively.
+///
+/// # Returns
+/// A vector containing the full paths of every file found.
+#[must_use]
+fn collect_files(dirs: &[PathBuf]) -> Vec<PathBuf> {
+    dirs.iter()
         .flat_map(|dir| {
             WalkDir::new(dir)
                 .into_iter()
@@ -131,15 +159,22 @@ pub fn find_duplicates_in_dirs(dirs: &[PathBuf]) -> HashMap<String, Vec<PathBuf>
                 .map(|entry| entry.path().to_path_buf())
                 .collect::<Vec<_>>()
         })
-        .collect();
+        .collect()
+}
 
-    info!("{} files identified across {} directories", files.len(), dirs.len());
-    println!("{} files identified across {} directories", files.len(), dirs.len());
-    let progress: Arc<ProgressBar> = Arc::new(ProgressBar::new(files.len() as u64));
-    progress.set_style(progress_style.clone());
+/// Groups files by size and returns a map keyed by file length.
+///
+/// # Arguments
+/// * `files` - List of file paths to examine.
+/// * `style` - Progress bar style shared across stages.
+///
+/// # Returns
+/// A map from file size to the files with that length.
+fn group_by_size(files: &[PathBuf], style: &ProgressStyle) -> HashMap<u64, Vec<PathBuf>> {
+    let progress = ProgressBar::new(files.len() as u64);
+    progress.set_style(style.clone());
     progress.set_message("Indexing files by size...");
 
-    // Loop over all files to collect them by size to quickly filter out non-duplicates.
     let size_entries: Vec<(u64, PathBuf)> = files
         .par_iter()
         .filter_map(|file| {
@@ -149,69 +184,94 @@ pub fn find_duplicates_in_dirs(dirs: &[PathBuf]) -> HashMap<String, Vec<PathBuf>
         })
         .collect();
 
-    // Aggregate into HashMap<u64, Vec<PathBuf>> grouped by size
     let mut size_map: HashMap<u64, Vec<PathBuf>> = HashMap::new();
     for (size, path) in size_entries {
         size_map.entry(size).or_default().push(path);
     }
 
-progress.finish_with_message("File sizes indexed.");
+    progress.finish_with_message("File sizes indexed.");
     info!("{} file sizes identified.", size_map.len());
     println!("{} file sizes identified.", size_map.len());
-    let progress: Arc<ProgressBar> = Arc::new(ProgressBar::new(size_map.len() as u64));
-    progress.set_style(progress_style.clone());
-    progress.set_message("Computing quick hashes..");
-    // Further filter files by quick hash
+    size_map
+}
+
+/// Filters size groups using a quick hash of the first 8 KiB of each file.
+///
+/// # Arguments
+/// * `size_map` - Files grouped by size from [`group_by_size`].
+/// * `style` - Progress bar style shared across stages.
+///
+/// # Returns
+/// A map from quick hash to files sharing that hash.
+fn group_by_quick_hash(
+    size_map: HashMap<u64, Vec<PathBuf>>,
+    style: &ProgressStyle,
+) -> HashMap<u64, Vec<PathBuf>> {
+    let progress = ProgressBar::new(size_map.len() as u64);
+    progress.set_style(style.clone());
+    progress.set_message("Computing quick hashes...");
+
     let potential_dupes: HashMap<u64, Vec<PathBuf>> = size_map
-    .into_par_iter()
-    .filter(|(_, files)| files.len() > 1)
-    .flat_map_iter(|(_, files)| {
-        let mut quick_hash_map: HashMap<u64, Vec<PathBuf>> = HashMap::new();
-        for file in files {
-            if let Some(qh) = quick_hash(&file) {
-                quick_hash_map.entry(qh).or_default().push(file);
+        .into_par_iter()
+        .filter(|(_, files)| files.len() > 1)
+        .flat_map_iter(|(_, files)| {
+            let mut quick_hash_map: HashMap<u64, Vec<PathBuf>> = HashMap::new();
+            for file in files {
+                if let Some(qh) = quick_hash(&file) {
+                    quick_hash_map.entry(qh).or_default().push(file);
+                }
             }
-        }
-        progress.inc(1); // Safe in Rayon
-        quick_hash_map
-            .into_iter()
-            .filter(|(_, group)| group.len() > 1)
-            .collect::<Vec<_>>() // (quick_hash, group)
-    })
-    .collect();
+            progress.inc(1);
+            quick_hash_map
+                .into_iter()
+                .filter(|(_, group)| group.len() > 1)
+                .collect::<Vec<_>>()
+        })
+        .collect();
 
     progress.finish_with_message("Quick hashes complete.");
     info!("{} unique quick hashes identified.", potential_dupes.len());
     println!("{} unique quick hashes identified.", potential_dupes.len());
-    let total_files = potential_dupes.values().map(Vec::len).sum::<usize>() as u64;
-    let progress = Arc::new(ProgressBar::new(total_files));
-    progress.set_style(progress_style.clone());
-    progress.set_message("Computing full hashes...");
-
-    // Final step: Perform full hashing (SHA-256) and group duplicates
-    let duplicates: HashMap<String, Vec<PathBuf>> = potential_dupes
-    .into_par_iter()
-    .flat_map_iter(|(_qh, files)| {
-        let mut hash_map: HashMap<String, Vec<PathBuf>> = HashMap::new();
-        for file in files {
-            if let Some(fh) = full_hash(&file) {
-                hash_map.entry(fh).or_default().push(file);
-            }
-            progress.inc(1); // safe to call from rayon threads
-        }
-        hash_map
-            .into_iter()
-            .filter(|(_, g)| g.len() > 1)
-            .collect::<Vec<_>>()
-    })
-    .collect();
-
-    progress.finish_with_message("Full hashes computed.");
-
-    info!("{} duplicate files identified.", duplicates.len());
-    duplicates  // Return the found duplicates
+    potential_dupes
 }
 
+/// Performs full SHA‑256 hashing on candidates and groups confirmed duplicates.
+///
+/// # Arguments
+/// * `potential_dupes` - Files that matched in [`group_by_quick_hash`].
+/// * `style` - Progress bar style shared across stages.
+///
+/// # Returns
+/// A map from SHA-256 hash to all files with identical content.
+fn group_by_full_hash(
+    potential_dupes: HashMap<u64, Vec<PathBuf>>,
+    style: &ProgressStyle,
+) -> HashMap<String, Vec<PathBuf>> {
+    let total_files = potential_dupes.values().map(Vec::len).sum::<usize>() as u64;
+    let progress = ProgressBar::new(total_files);
+    progress.set_style(style.clone());
+    progress.set_message("Computing full hashes...");
+
+    let duplicates: HashMap<String, Vec<PathBuf>> = potential_dupes
+        .into_par_iter()
+        .flat_map_iter(|(_qh, files)| {
+            let mut hash_map: HashMap<String, Vec<PathBuf>> = HashMap::new();
+            for file in files {
+                if let Some(fh) = full_hash(&file) {
+                    hash_map.entry(fh).or_default().push(file);
+                }
+                progress.inc(1);
+            }
+            hash_map
+                .into_iter()
+                .filter(|(_, g)| g.len() > 1)
+                .collect::<Vec<_>>()
+        })
+        .collect();
+
+    progress.finish_with_message("Full hashes computed.");
+    duplicates
+}
 
 /// Writes a report of duplicate files to a specified output file, including metadata such as
 /// the user who generated the report, the start and end time, and the base directory scanned.
@@ -259,14 +319,16 @@ progress.finish_with_message("File sizes indexed.");
 ///     Ok(())
 /// }
 /// ```
-/// 
+///
 pub fn write_output<S: ::std::hash::BuildHasher>(
     duplicates: HashMap<String, Vec<PathBuf>, S>,
     output_file: &str,
     start_time: &str,
     base_dirs: &[PathBuf],
 ) -> Result<(), Box<dyn Error>> {
-    let mut entries: Vec<(u64, Vec<PathBuf>)> = duplicates.into_values().map(|paths| {
+    let mut entries: Vec<(u64, Vec<PathBuf>)> = duplicates
+        .into_values()
+        .map(|paths| {
             let size = fs::metadata(&paths[0]).map(|m| m.len()).unwrap_or(0);
             (size, paths)
         })
@@ -295,11 +357,16 @@ pub fn write_output<S: ::std::hash::BuildHasher>(
     writeln!(writer)?;
 
     // Calculate potential space savings
-    let total_savings: u64 = entries.iter()
+    let total_savings: u64 = entries
+        .iter()
         .map(|(size, paths)| size * (paths.len().saturating_sub(1) as u64))
         .sum();
 
-    writeln!(writer, "Total Potential Space Savings: {}", format_size(total_savings))?;
+    writeln!(
+        writer,
+        "Total Potential Space Savings: {}",
+        format_size(total_savings)
+    )?;
     writeln!(writer)?;
 
     // Write duplicate files
@@ -363,11 +430,10 @@ fn quick_hash(file_path: &Path) -> Option<u64> {
     let mut reader = BufReader::new(file);
     let mut buffer = [0; QUICK_HASH_SIZE];
     let bytes_read = reader.read(&mut buffer).ok()?;
-    
+
     hasher.write(&buffer[..bytes_read]);
     Some(hasher.finish())
 }
-
 
 /// Computes a full SHA-256 hash of a file's contents.
 ///
@@ -391,16 +457,14 @@ fn full_hash(file_path: &Path) -> Option<String> {
     let mut buffer = [0; FULL_HASH_BUFFER_SIZE];
 
     while let Ok(bytes_read) = reader.read(&mut buffer) {
-        if bytes_read == 0 { break; }
+        if bytes_read == 0 {
+            break;
+        }
         hasher.update(&buffer[..bytes_read]);
     }
 
     Some(format!("{:x}", hasher.finalize()))
 }
-
-
-
-
 
 #[cfg(test)]
 mod tests {
@@ -478,7 +542,8 @@ mod tests {
         fs::write(&file2, "Duplicate content").expect("write file");
         fs::write(&unique, "Unique content").expect("write file");
 
-        let duplicates = find_duplicates_in_dirs(&[dir1.path().to_path_buf(), dir2.path().to_path_buf()]);
+        let duplicates =
+            find_duplicates_in_dirs(&[dir1.path().to_path_buf(), dir2.path().to_path_buf()]);
         assert_eq!(duplicates.len(), 1);
         let group = duplicates.values().next().expect("duplicates");
         assert_eq!(group.len(), 2);
@@ -497,10 +562,7 @@ mod tests {
         fs::write(&file2, "Duplicate content").expect("write file");
 
         let mut duplicates = HashMap::new();
-        duplicates.insert(
-            "dummy_hash".to_string(),
-            vec![file1.clone(), file2.clone()],
-        );
+        duplicates.insert("dummy_hash".to_string(), vec![file1.clone(), file2.clone()]);
 
         let output_file = dir.path().join("output.txt");
         let _res = write_output(
@@ -511,5 +573,8 @@ mod tests {
         );
 
         let output = fs::read_to_string(&output_file).expect("read file");
-        assert!(output.contains("Duplicate File Finder Report"));        assert!(output.contains(file1.to_str().expect("valid UTF-8")));
-        assert!(output.contains(file2.to_str().expect("valid UTF-8")));    }}
+        assert!(output.contains("Duplicate File Finder Report"));
+        assert!(output.contains(file1.to_str().expect("valid UTF-8")));
+        assert!(output.contains(file2.to_str().expect("valid UTF-8")));
+    }
+}
