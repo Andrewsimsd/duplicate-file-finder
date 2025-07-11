@@ -40,6 +40,7 @@ cargo install duplicate_file_finder
 ### Command Line
 
 ```bash
+duplicate_file_finder [--output <file_or_directory>]
 duplicate_file_finder <directory> [--output <file_or_directory>]
 duplicate_file_finder --directories <dir1> <dir2> ... [--output <file_or_directory>]
 ```
@@ -51,6 +52,8 @@ duplicate_file_finder ~/Documents --output reports/
 ```
 
 This scans `~/Documents` and writes a human-readable report to `reports/duplicate_file_report.txt`.
+
+Running `duplicate_file_finder` with no arguments scans the directory it is executed from and saves `duplicate_file_report.txt` in that same directory.
 
 ### Options
 

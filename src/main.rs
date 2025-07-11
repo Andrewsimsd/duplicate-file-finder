@@ -1,10 +1,10 @@
 #![warn(clippy::pedantic)]
 
-use std::path::PathBuf;
-use clap::{Parser, ArgGroup};
-use log::{error, info};
 use chrono::Local;
-use duplicate_file_finder::{setup_logger, find_duplicates, find_duplicates_in_dirs, write_output};
+use clap::{ArgGroup, Parser};
+use duplicate_file_finder::{find_duplicates, find_duplicates_in_dirs, setup_logger, write_output};
+use log::{error, info};
+use std::path::PathBuf;
 
 const VERSION: &str = "0.1.4";
 const DEFAULT_REPORT_FILENAME: &str = "duplicate_file_report.txt";
@@ -14,7 +14,7 @@ const DEFAULT_REPORT_FILENAME: &str = "duplicate_file_report.txt";
     author,
     version = VERSION,
     about = "Scans the specified directory recursively for duplicate files.",
-    group = ArgGroup::new("input").required(true).args(["directory", "directories"])
+    group = ArgGroup::new("input").args(["directory", "directories"])
 )]
 struct Cli {
     /// Directory to scan for duplicates
@@ -37,8 +37,10 @@ fn main() {
 
     let dirs: Vec<PathBuf> = if let Some(multi) = cli.directories.clone() {
         multi
+    } else if let Some(dir) = cli.directory.clone() {
+        vec![dir]
     } else {
-        vec![cli.directory.clone().expect("a directory path is required")] 
+        vec![std::env::current_dir().expect("cannot determine current directory")]
     };
 
     let mut output_file = cli
@@ -63,7 +65,10 @@ fn main() {
         info!("Starting duplicate file detection in {}", dirs[0].display());
     } else {
         println!("Scanning {} directories", dirs.len());
-        info!("Starting duplicate file detection across {} directories", dirs.len());
+        info!(
+            "Starting duplicate file detection across {} directories",
+            dirs.len()
+        );
     }
     println!("Output will be saved to: {}", output_file.display());
 
